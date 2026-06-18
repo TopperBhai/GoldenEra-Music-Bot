@@ -45,16 +45,30 @@ export default {
         return interaction.editReply('❌ Kuch nahi mila! Search term check karo.');
       }
 
-      let trackToPlay = ytSearch.tracks[0];
+      const trackToPlay = ytSearch.tracks[0];
 
-      // Bypass YouTube stream IP blocks by assigning our custom yt-dlp extractor to stream this track
-      const ytDlpExt = player.extractors.get('YtDlpExtractor');
-      if (ytDlpExt) {
-        trackToPlay.extractor = ytDlpExt;
+      // Bypass YouTube IP blocks by directly fetching the raw media stream URL using yt-dlp
+      await interaction.editReply('⏳ Bypassing YouTube stream blocks...');
+      const youtubedl = (await import('youtube-dl-exec')).default;
+      
+      let rawUrl = '';
+      try {
+        const ytdlOutput = await youtubedl(trackToPlay.url, {
+          dumpSingleJson: true,
+          noWarnings: true,
+          noCallHome: true,
+          noCheckCertificate: true,
+          youtubeSkipDashManifest: true,
+          format: 'bestaudio',
+        });
+        rawUrl = ytdlOutput.url;
+      } catch (e) {
+        console.error('yt-dlp error:', e);
+        return interaction.editReply('❌ Stream link extract nahi kar paya.');
       }
 
-      // Play the track directly
-      const result = await player.play(member.voice.channel, trackToPlay, {
+      // Play the raw URL
+      const result = await player.play(member.voice.channel, rawUrl, {
         nodeOptions: {
           metadata: interaction,
           volume: 80,
@@ -64,6 +78,12 @@ export default {
           selfDeaf: true
         }
       });
+
+      // Restore the metadata so it looks pretty in the queue
+      result.track.title = trackToPlay.title;
+      result.track.author = trackToPlay.author;
+      result.track.thumbnail = trackToPlay.thumbnail;
+      result.track.url = trackToPlay.url;
 
       const track = result.track;
       const title = isCategory && songDetails ? songDetails.title : track.title;

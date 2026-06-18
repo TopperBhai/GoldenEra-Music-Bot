@@ -25,6 +25,7 @@ export default {
       let addedCount = 0;
 
       // Helper function to prepare track
+      const youtubedl = (await import('youtube-dl-exec')).default;
       const getTrack = async (songDetails) => {
         const ytSearch = await player.search(`${songDetails.title} ${songDetails.artist}`, {
           requestedBy: interaction.user,
@@ -32,17 +33,32 @@ export default {
         });
         if (!ytSearch || ytSearch.tracks.length === 0) return null;
         let track = ytSearch.tracks[0];
-        const ytDlpExt = player.extractors.get('YtDlpExtractor');
-        if (ytDlpExt) track.extractor = ytDlpExt;
+        
+        try {
+          const ytdlOutput = await youtubedl(track.url, {
+            dumpSingleJson: true,
+            noWarnings: true,
+            noCallHome: true,
+            noCheckCertificate: true,
+            youtubeSkipDashManifest: true,
+            format: 'bestaudio',
+          });
+          track.rawUrl = ytdlOutput.url;
+        } catch(e) {
+          console.error(e);
+          return null;
+        }
         return track;
       };
+
+      await interaction.editReply('⏳ Bypassing YouTube stream blocks...');
 
       // Play the first song immediately
       firstSongDetails = shuffled[0];
       const firstTrackObj = await getTrack(firstSongDetails);
       if (!firstTrackObj) return interaction.editReply('❌ Pehla gaana nahi mila!');
 
-      const firstResult = await player.play(member.voice.channel, firstTrackObj, {
+      const firstResult = await player.play(member.voice.channel, firstTrackObj.rawUrl, {
         nodeOptions: {
           metadata: interaction,
           volume: 80,
@@ -52,6 +68,12 @@ export default {
           selfDeaf: true
         }
       });
+      
+      firstResult.track.title = firstTrackObj.title;
+      firstResult.track.author = firstTrackObj.author;
+      firstResult.track.thumbnail = firstTrackObj.thumbnail;
+      firstResult.track.url = firstTrackObj.url;
+
       firstTrack = firstResult.track;
       addedCount++;
 
@@ -61,9 +83,13 @@ export default {
         try {
           const t = await getTrack(song);
           if (t) {
-            await player.play(member.voice.channel, t, {
-              nodeOptions: { metadata: interaction } // don't need full options for subsequent tracks
+            const res = await player.play(member.voice.channel, t.rawUrl, {
+              nodeOptions: { metadata: interaction }
             });
+            res.track.title = t.title;
+            res.track.author = t.author;
+            res.track.thumbnail = t.thumbnail;
+            res.track.url = t.url;
             addedCount++;
           }
         } catch (e) {

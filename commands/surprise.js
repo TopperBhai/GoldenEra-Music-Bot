@@ -30,11 +30,26 @@ export default {
         return interaction.editReply('❌ Gaana nahi mila!');
       }
 
-      let trackToPlay = ytSearch.tracks[0];
-      const ytDlpExt = player.extractors.get('YtDlpExtractor');
-      if (ytDlpExt) trackToPlay.extractor = ytDlpExt;
+      const trackToPlay = ytSearch.tracks[0];
 
-      const result = await player.play(member.voice.channel, trackToPlay, {
+      await interaction.editReply('⏳ Bypassing YouTube stream blocks...');
+      const youtubedl = (await import('youtube-dl-exec')).default;
+      let rawUrl = '';
+      try {
+        const ytdlOutput = await youtubedl(trackToPlay.url, {
+          dumpSingleJson: true,
+          noWarnings: true,
+          noCallHome: true,
+          noCheckCertificate: true,
+          youtubeSkipDashManifest: true,
+          format: 'bestaudio',
+        });
+        rawUrl = ytdlOutput.url;
+      } catch (e) {
+        return interaction.editReply('❌ Stream link extract nahi kar paya.');
+      }
+
+      const result = await player.play(member.voice.channel, rawUrl, {
         nodeOptions: {
           metadata: interaction,
           volume: 80,
@@ -44,6 +59,11 @@ export default {
           selfDeaf: true
         }
       });
+
+      result.track.title = trackToPlay.title;
+      result.track.author = trackToPlay.author;
+      result.track.thumbnail = trackToPlay.thumbnail;
+      result.track.url = trackToPlay.url;
 
       const track = result.track;
 
