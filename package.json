@@ -29,6 +29,7 @@
     "ffmpeg-static": "^5.2.0",
     "opusscript": "^0.0.8",
     "undici": "^7.28.0",
+    "youtube-dl-exec": "^3.1.7",
     "youtube-ext": "^1.1.25",
     "youtubei.js": "^17.0.1"
   }
