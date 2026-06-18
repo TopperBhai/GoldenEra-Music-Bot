@@ -54,6 +54,9 @@ export class JioSaavnExtractor extends BaseExtractor {
         raw: trackInfo // Store the JioSaavn payload so we can grab the ID during streaming
       });
 
+      // 5. CRITICAL FIX: Explicitly tell discord-player that this extractor handles this track's stream!
+      track.extractor = this;
+
       return this.createResponse(null, [track]);
     } catch (e) {
       console.error('JioSaavn Search Error:', e);
@@ -62,34 +65,39 @@ export class JioSaavnExtractor extends BaseExtractor {
   }
 
   async stream(info) {
-    const trackId = info.raw.id;
-    if (!trackId) throw new Error('No JioSaavn ID found for stream request.');
+    try {
+      const trackId = info.raw.id;
+      if (!trackId) throw new Error('No JioSaavn ID found for stream request.');
 
-    // 1. Fetch encrypted URL using the song details API
-    const detailUrl = `https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=${trackId}`;
-    const res = await fetch(detailUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' }
-    });
-    const data = await res.json();
-    
-    if (!data[trackId] || !data[trackId].encrypted_media_url) {
-      throw new Error('JioSaavn did not return an encrypted media URL.');
+      // 1. Fetch encrypted URL using the song details API
+      const detailUrl = `https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=${trackId}`;
+      const res = await fetch(detailUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' }
+      });
+      const data = await res.json();
+      
+      if (!data[trackId] || !data[trackId].encrypted_media_url) {
+        throw new Error('JioSaavn did not return an encrypted media URL.');
+      }
+
+      // 2. Decrypt the raw MP4 stream URL using JioSaavn's static DES-ECB key
+      const enc = data[trackId].encrypted_media_url;
+      const key = CryptoJS.enc.Utf8.parse('38346591');
+      const dec = CryptoJS.DES.decrypt({ ciphertext: CryptoJS.enc.Base64.parse(enc) }, key, { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 });
+      let streamUrl = dec.toString(CryptoJS.enc.Utf8);
+
+      // 3. Force 320kbps premium quality 
+      streamUrl = streamUrl.replace('_96.mp4', '_320.mp4').replace('_160.mp4', '_320.mp4');
+
+      // 4. Return a raw Readable web stream so discord-player doesn't try to bridge the string URL
+      const streamRes = await fetch(streamUrl);
+      if (!streamRes.ok || !streamRes.body) throw new Error('Failed to fetch audio stream bytes from JioSaavn CDN.');
+      
+      // Convert Web ReadableStream to Node.js Readable stream for FFMPEG compatibility
+      return Readable.fromWeb(streamRes.body);
+    } catch (error) {
+      console.error('🔥 CRITICAL ERROR IN JIOSAAVN STREAM:', error);
+      throw error;
     }
-
-    // 2. Decrypt the raw MP4 stream URL using JioSaavn's static DES-ECB key
-    const enc = data[trackId].encrypted_media_url;
-    const key = CryptoJS.enc.Utf8.parse('38346591');
-    const dec = CryptoJS.DES.decrypt({ ciphertext: CryptoJS.enc.Base64.parse(enc) }, key, { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 });
-    let streamUrl = dec.toString(CryptoJS.enc.Utf8);
-
-    // 3. Force 320kbps premium quality 
-    streamUrl = streamUrl.replace('_96.mp4', '_320.mp4').replace('_160.mp4', '_320.mp4');
-
-    // 4. Return a raw Readable web stream so discord-player doesn't try to bridge the string URL
-    const streamRes = await fetch(streamUrl);
-    if (!streamRes.ok || !streamRes.body) throw new Error('Failed to fetch audio stream bytes from JioSaavn CDN.');
-    
-    // Convert Web ReadableStream to Node.js Readable stream for FFMPEG compatibility
-    return Readable.fromWeb(streamRes.body);
   }
 }
