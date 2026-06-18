@@ -9,10 +9,7 @@ export default {
   async execute(interaction) {
     const member = interaction.member;
     if (!member.voice.channel) {
-      return interaction.reply({
-        content: '❌ Pehle voice channel mein aao… phir gaana sunenge 🎵',
-        flags: 64
-      });
+      return interaction.reply({ content: '❌ Pehle voice channel mein aao… phir gaana sunenge 🎵', flags: 64 });
     }
 
     await interaction.deferReply();
@@ -26,18 +23,13 @@ export default {
         guildId: interaction.guildId,
         textId: interaction.channelId,
         voiceId: member.voice.channel.id,
-        volume: 100,
-        deaf: true,
-        mute: false
+        volume: 100, deaf: true, mute: false
       });
 
-      // Try YouTube Music first, then YouTube, then SoundCloud
-      let res = await interaction.client.manager.search(`ytmsearch:${searchQuery}`, { requester: interaction.user });
+      // SoundCloud first (reliable streaming), then YouTube Music fallback
+      let res = await interaction.client.manager.search(`scsearch:${searchQuery}`, { requester: interaction.user }).catch(() => null);
       if (!res?.tracks?.length) {
-        res = await interaction.client.manager.search(`ytsearch:${searchQuery}`, { requester: interaction.user });
-      }
-      if (!res?.tracks?.length) {
-        res = await interaction.client.manager.search(`scsearch:${searchQuery}`, { requester: interaction.user });
+        res = await interaction.client.manager.search(`ytmsearch:${searchQuery}`, { requester: interaction.user }).catch(() => null);
       }
 
       if (!res?.tracks?.length) {
@@ -46,10 +38,7 @@ export default {
 
       const track = res.tracks[0];
       player.queue.add(track);
-
-      if (!player.playing && !player.paused) {
-        player.play();
-      }
+      if (!player.playing && !player.paused) player.play();
 
       const embed = new EmbedBuilder()
         .setColor('#9C27B0')
@@ -58,9 +47,7 @@ export default {
         .setFooter({ text: 'Yeh surprise acha laga? ✨' })
         .setTimestamp();
 
-      if (track.thumbnail) {
-        embed.setThumbnail(track.thumbnail);
-      }
+      if (track.thumbnail) embed.setThumbnail(track.thumbnail);
 
       const buttons = new ActionRowBuilder()
         .addComponents(
@@ -72,7 +59,6 @@ export default {
         );
 
       return interaction.editReply({ embeds: [embed], components: [buttons] });
-
     } catch (error) {
       console.error('Error in surprise command:', error);
       return interaction.editReply('❌ Surprise mein dikkat aayi. Dobara try karo.');

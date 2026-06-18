@@ -1,20 +1,41 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { playlists, getRandomSong } from '../data/playlists.js';
 
-// Helper: robust multi-engine search with YouTube Music priority
-async function robustSearch(manager, query, requester) {
-  const engines = ['ytmsearch', 'ytsearch', 'scsearch'];
-  
-  for (const engine of engines) {
-    try {
-      const res = await manager.search(`${engine}:${query}`, { requester });
-      if (res && res.tracks && res.tracks.length > 0) {
-        return res;
-      }
-    } catch (e) {
-      console.error(`Search failed on ${engine}:`, e.message);
+// Smart search: tries SoundCloud first (reliable streaming), then YouTube Music
+async function smartSearch(manager, query, requester) {
+  // 1. Try SoundCloud first — streaming is 100% reliable, no IP blocks
+  try {
+    const scRes = await manager.search(`scsearch:${query}`, { requester });
+    if (scRes?.tracks?.length > 0) {
+      console.log(`🔍 Found on SoundCloud: ${scRes.tracks[0].title}`);
+      return scRes;
     }
+  } catch (e) {
+    console.error('SoundCloud search failed:', e.message);
   }
+
+  // 2. Fallback to YouTube Music (may get IP blocked but worth trying)
+  try {
+    const ytmRes = await manager.search(`ytmsearch:${query}`, { requester });
+    if (ytmRes?.tracks?.length > 0) {
+      console.log(`🔍 Found on YouTube Music: ${ytmRes.tracks[0].title}`);
+      return ytmRes;
+    }
+  } catch (e) {
+    console.error('YouTube Music search failed:', e.message);
+  }
+
+  // 3. Last resort: standard YouTube search
+  try {
+    const ytRes = await manager.search(`ytsearch:${query}`, { requester });
+    if (ytRes?.tracks?.length > 0) {
+      console.log(`🔍 Found on YouTube: ${ytRes.tracks[0].title}`);
+      return ytRes;
+    }
+  } catch (e) {
+    console.error('YouTube search failed:', e.message);
+  }
+
   return null;
 }
 
@@ -51,7 +72,6 @@ export default {
           const oembedRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(query)}&format=json`);
           if (oembedRes.ok) {
             const data = await oembedRes.json();
-            // Clean up the title: remove bracketed text and everything after |
             let cleanTitle = data.title;
             cleanTitle = cleanTitle.split('|')[0];
             cleanTitle = cleanTitle.replace(/(\(|\[).*?(\)|\])/g, '');
@@ -62,7 +82,6 @@ export default {
           }
         } catch (e) {
           console.error("oEmbed fetch failed:", e.message);
-          // If oEmbed fails, just use the raw query as search text
         }
       } else if (playlists[query.toLowerCase()]) {
         const playlist = playlists[query.toLowerCase()];
@@ -81,8 +100,18 @@ export default {
         mute: false
       });
 
-      // Robust multi-engine search
-      const res = await robustSearch(interaction.client.manager, searchQuery, interaction.user);
+      // Force unmute the bot after joining (fixes Discord sometimes auto-muting bots)
+      setTimeout(async () => {
+        try {
+          const me = interaction.guild.members.me;
+          if (me?.voice?.channelId) {
+            await me.voice.setMute(false, 'Ensuring bot audio works').catch(() => {});
+          }
+        } catch (e) {}
+      }, 2000);
+
+      // Smart search: SoundCloud first (reliable streaming), YouTube as fallback
+      const res = await smartSearch(interaction.client.manager, searchQuery, interaction.user);
 
       if (!res || !res.tracks || !res.tracks.length) {
         return interaction.editReply('❌ Kuch nahi mila! Please try a different search term.');
@@ -97,48 +126,26 @@ export default {
 
       const title = isCategory && songDetails ? songDetails.title : track.title;
       const author = isCategory && songDetails ? songDetails.artist : track.author;
+      const source = track.sourceName || 'unknown';
 
       const embed = new EmbedBuilder()
         .setColor('#FFD700')
         .setTitle('🎶 Now Playing')
         .setDescription(`**${title}**\n${author}`)
+        .setFooter({ text: isCategory && songDetails?.message ? songDetails.message : `Source: ${source}` })
         .setTimestamp();
 
       if (track.thumbnail) {
         embed.setThumbnail(track.thumbnail);
       }
-      
-      if (isCategory && songDetails && songDetails.message) {
-        embed.setFooter({ text: songDetails.message });
-      }
 
       const buttons = new ActionRowBuilder()
         .addComponents(
-          new ButtonBuilder()
-            .setCustomId('pause')
-            .setLabel('Pause')
-            .setEmoji('⏸️')
-            .setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder()
-            .setCustomId('resume')
-            .setLabel('Resume')
-            .setEmoji('▶️')
-            .setStyle(ButtonStyle.Success),
-          new ButtonBuilder()
-            .setCustomId('skip')
-            .setLabel('Skip')
-            .setEmoji('⏭️')
-            .setStyle(ButtonStyle.Primary),
-          new ButtonBuilder()
-            .setCustomId('loop')
-            .setLabel('Loop')
-            .setEmoji('🔁')
-            .setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder()
-            .setCustomId('stop')
-            .setLabel('Stop')
-            .setEmoji('⏹️')
-            .setStyle(ButtonStyle.Danger)
+          new ButtonBuilder().setCustomId('pause').setLabel('Pause').setEmoji('⏸️').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId('resume').setLabel('Resume').setEmoji('▶️').setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId('skip').setLabel('Skip').setEmoji('⏭️').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId('loop').setLabel('Loop').setEmoji('🔁').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId('stop').setLabel('Stop').setEmoji('⏹️').setStyle(ButtonStyle.Danger)
         );
 
       return interaction.editReply({ embeds: [embed], components: [buttons] });
@@ -148,10 +155,7 @@ export default {
       if (interaction.deferred) {
         return interaction.editReply('❌ Gaana search karne mein dikkat aayi. Dobara try karo.');
       } else {
-        return interaction.reply({ 
-          content: '❌ Gaana search karne mein dikkat aayi. Dobara try karo.',
-          flags: 64 
-        });
+        return interaction.reply({ content: '❌ Gaana search karne mein dikkat aayi. Dobara try karo.', flags: 64 });
       }
     }
   }

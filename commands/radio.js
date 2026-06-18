@@ -9,10 +9,7 @@ export default {
   async execute(interaction) {
     const member = interaction.member;
     if (!member.voice.channel) {
-      return interaction.reply({
-        content: '❌ Pehle voice channel mein aao… phir gaana sunenge 🎵',
-        flags: 64
-      });
+      return interaction.reply({ content: '❌ Pehle voice channel mein aao… phir gaana sunenge 🎵', flags: 64 });
     }
 
     await interaction.deferReply();
@@ -22,9 +19,7 @@ export default {
         guildId: interaction.guildId,
         textId: interaction.channelId,
         voiceId: member.voice.channel.id,
-        volume: 100,
-        deaf: true,
-        mute: false
+        volume: 100, deaf: true, mute: false
       });
 
       const allSongs = getAllSongs();
@@ -32,13 +27,12 @@ export default {
       let firstSongDetails = null;
       let addedCount = 0;
 
-      // Pick 10 unique random songs
       const shuffled = [...allSongs].sort(() => Math.random() - 0.5).slice(0, 10);
 
-      // Search all 10 songs in parallel for speed
+      // Search all 10 songs in parallel via SoundCloud (reliable streaming)
       const searchPromises = shuffled.map(song => {
         const q = `${song.title} ${song.artist}`;
-        return interaction.client.manager.search(`ytmsearch:${q}`, { requester: interaction.user })
+        return interaction.client.manager.search(`scsearch:${q}`, { requester: interaction.user })
           .then(res => ({ res, song }))
           .catch(() => ({ res: null, song }));
       });
@@ -47,11 +41,10 @@ export default {
 
       for (const { res, song } of results) {
         if (res?.tracks?.length) {
-          const track = res.tracks[0];
-          player.queue.add(track);
+          player.queue.add(res.tracks[0]);
           addedCount++;
           if (!firstTrack) {
-            firstTrack = track;
+            firstTrack = res.tracks[0];
             firstSongDetails = song;
           }
         }
@@ -61,9 +54,7 @@ export default {
         return interaction.editReply('❌ Radio start nahi ho paya, search failed.');
       }
 
-      if (!player.playing && !player.paused) {
-        player.play();
-      }
+      if (!player.playing && !player.paused) player.play();
 
       const embed = new EmbedBuilder()
         .setColor('#E91E63')
@@ -73,9 +64,7 @@ export default {
         .setFooter({ text: 'Use /stop to turn off radio' })
         .setTimestamp();
 
-      if (firstTrack.thumbnail) {
-        embed.setThumbnail(firstTrack.thumbnail);
-      }
+      if (firstTrack.thumbnail) embed.setThumbnail(firstTrack.thumbnail);
 
       const buttons = new ActionRowBuilder()
         .addComponents(
@@ -86,7 +75,6 @@ export default {
         );
 
       return interaction.editReply({ embeds: [embed], components: [buttons] });
-
     } catch (error) {
       console.error('Error in radio command:', error);
       return interaction.editReply('❌ Radio mein dikkat aayi. Dobara try karo.');
