@@ -52,15 +52,27 @@ const player = new Player(client, {
   ytdlOptions: {
     quality: 'highestaudio',
     highWaterMark: 1 << 25
-  }
-});
+import fs from 'fs';
 
-import { YtDlpExtractor } from './extractors/ytdlp.js';
+let cookieStr = '';
+try {
+  if (fs.existsSync('./cookies.txt')) {
+    const lines = fs.readFileSync('./cookies.txt', 'utf8').split('\n');
+    cookieStr = lines.map(l => {
+      const p = l.split('\t');
+      if (p.length >= 7 && p[0].includes('.youtube.com')) return `${p[5]}=${p[6].trim()}`;
+    }).filter(Boolean).join('; ');
+    console.log('✅ Loaded YouTube Cookies for authentication!');
+  }
+} catch (e) {
+  console.log('⚠️ No valid cookies.txt found or failed to parse.');
+}
 
 // Register extractors
 await player.extractors.loadDefault();
-await player.extractors.register(YoutubeiExtractor, {});
-await player.extractors.register(YtDlpExtractor, {});
+await player.extractors.register(YoutubeiExtractor, {
+  authentication: cookieStr
+});
 console.log('✅ Extractors registered successfully!');
 
 // --- Player Events ---

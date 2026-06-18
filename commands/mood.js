@@ -45,35 +45,9 @@ export default {
         return interaction.editReply('❌ Gaana nahi mila!');
       }
 
-      const trackToPlay = ytSearch.tracks[0];
+      let trackToPlay = ytSearch.tracks[0];
 
-      await interaction.editReply('⏳ Bypassing YouTube stream blocks...');
-      const youtubedl = (await import('youtube-dl-exec')).default;
-      const fs = await import('fs');
-      const path = await import('path');
-      
-      let rawUrl = '';
-      try {
-        const cookiesPath = path.join(process.cwd(), 'cookies.txt');
-        const ytdlOptions = {
-          dumpSingleJson: true,
-          noWarnings: true,
-          noCallHome: true,
-          noCheckCertificate: true,
-          youtubeSkipDashManifest: true,
-          format: 'bestaudio',
-        };
-        if (fs.existsSync(cookiesPath)) {
-          ytdlOptions.cookies = cookiesPath;
-        }
-
-        const ytdlOutput = await youtubedl(trackToPlay.url, ytdlOptions);
-        rawUrl = ytdlOutput.url;
-      } catch (e) {
-        return interaction.editReply('❌ Stream link extract nahi kar paya. YouTube blocked the connection.');
-      }
-
-      const result = await player.play(member.voice.channel, rawUrl, {
+      const result = await player.play(member.voice.channel, trackToPlay, {
         nodeOptions: {
           metadata: interaction,
           volume: 80,
@@ -83,11 +57,6 @@ export default {
           selfDeaf: true
         }
       });
-
-      result.track.title = trackToPlay.title;
-      result.track.author = trackToPlay.author;
-      result.track.thumbnail = trackToPlay.thumbnail;
-      result.track.url = trackToPlay.url;
 
       const track = result.track;
 

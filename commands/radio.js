@@ -25,48 +25,21 @@ export default {
       let addedCount = 0;
 
       // Helper function to prepare track
-      const youtubedl = (await import('youtube-dl-exec')).default;
-      const fs = await import('fs');
-      const path = await import('path');
       const getTrack = async (songDetails) => {
         const ytSearch = await player.search(`${songDetails.title} ${songDetails.artist}`, {
           requestedBy: interaction.user,
           searchEngine: QueryType.YOUTUBE
         });
-        if (!ytSearch || ytSearch.tracks.length === 0) return null;
-        let track = ytSearch.tracks[0];
-        
-        try {
-          const cookiesPath = path.join(process.cwd(), 'cookies.txt');
-          const ytdlOptions = {
-            dumpSingleJson: true,
-            noWarnings: true,
-            noCallHome: true,
-            noCheckCertificate: true,
-            youtubeSkipDashManifest: true,
-            format: 'bestaudio',
-          };
-          if (fs.existsSync(cookiesPath)) {
-            ytdlOptions.cookies = cookiesPath;
-          }
-
-          const ytdlOutput = await youtubedl(track.url, ytdlOptions);
-          track.rawUrl = ytdlOutput.url;
-        } catch(e) {
-          console.error(e);
-          return null;
-        }
-        return track;
+        if (!ytSearch || !ytSearch.tracks.length) return null;
+        return ytSearch.tracks[0];
       };
-
-      await interaction.editReply('⏳ Bypassing YouTube stream blocks...');
 
       // Play the first song immediately
       firstSongDetails = shuffled[0];
       const firstTrackObj = await getTrack(firstSongDetails);
       if (!firstTrackObj) return interaction.editReply('❌ Pehla gaana nahi mila!');
 
-      const firstResult = await player.play(member.voice.channel, firstTrackObj.rawUrl, {
+      const firstResult = await player.play(member.voice.channel, firstTrackObj, {
         nodeOptions: {
           metadata: interaction,
           volume: 80,
@@ -76,12 +49,6 @@ export default {
           selfDeaf: true
         }
       });
-      
-      firstResult.track.title = firstTrackObj.title;
-      firstResult.track.author = firstTrackObj.author;
-      firstResult.track.thumbnail = firstTrackObj.thumbnail;
-      firstResult.track.url = firstTrackObj.url;
-
       firstTrack = firstResult.track;
       addedCount++;
 
@@ -91,13 +58,9 @@ export default {
         try {
           const t = await getTrack(song);
           if (t) {
-            const res = await player.play(member.voice.channel, t.rawUrl, {
-              nodeOptions: { metadata: interaction }
+            await player.play(member.voice.channel, t, {
+              nodeOptions: { metadata: interaction } // don't need full options for subsequent tracks
             });
-            res.track.title = t.title;
-            res.track.author = t.author;
-            res.track.thumbnail = t.thumbnail;
-            res.track.url = t.url;
             addedCount++;
           }
         } catch (e) {
