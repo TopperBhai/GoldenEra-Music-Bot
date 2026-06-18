@@ -71,11 +71,23 @@ try {
   console.log('⚠️ No valid cookies.txt found or failed to parse.');
 }
 
+import youtubedl from 'youtube-dl-exec';
+
 // Register extractors
 await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
 await player.extractors.register(YoutubeiExtractor, {
   cookie: cookieStr,
-  useYoutubeDL: true
+  createStream: async (q, ext) => {
+    const output = await youtubedl(q.url, {
+      dumpSingleJson: true,
+      noWarnings: true,
+      noCallHome: true,
+      noCheckCertificate: true,
+      youtubeSkipDashManifest: true,
+      format: 'bestaudio',
+    });
+    return output.url;
+  }
 });
 console.log('✅ Extractors registered successfully!');
 
