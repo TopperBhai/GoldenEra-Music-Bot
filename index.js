@@ -64,7 +64,7 @@ await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
 // Register the advanced Android TV YouTube client to permanently bypass the 429 block
 await player.extractors.register(YoutubeiExtractor, {
   streamOptions: {
-    useClient: 'TV_EMBEDDED' // TV_EMBEDDED avoids the 400 Bad Request error on datacenters
+    useClient: 'IOS' // IOS bypasses both datacenter 400 errors AND video embedding restrictions
   }
 });
 console.log('✅ Advanced YouTubei Engine initialized successfully!');
