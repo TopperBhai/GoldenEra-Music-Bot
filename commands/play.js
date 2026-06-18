@@ -41,8 +41,9 @@ export default {
         guildId: interaction.guildId,
         textId: interaction.channelId,
         voiceId: member.voice.channel.id,
-        volume: 50,
-        deaf: true
+        volume: 100,
+        deaf: true,
+        mute: false
       });
 
       // Search for the track using Kazagumo
