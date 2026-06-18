@@ -1,7 +1,6 @@
 import { BaseExtractor, Track } from 'discord-player';
 import CryptoJS from 'crypto-js';
-import { Readable, PassThrough } from 'stream';
-import axios from 'axios';
+
 
 export class JioSaavnExtractor extends BaseExtractor {
   static identifier = 'JioSaavnExtractor';
@@ -12,6 +11,7 @@ export class JioSaavnExtractor extends BaseExtractor {
 
   async validate(query, type) {
     // Handle text searches natively, and also accept JioSaavn track URLs during stream resolution
+    if (type === 'arbitrary') return true;
     return type === 'AUTO' || !query.startsWith('http') || query.includes('jiosaavn.com') || query.includes('saavn.com');
   }
 
@@ -90,27 +90,17 @@ export class JioSaavnExtractor extends BaseExtractor {
       // 3. Force 320kbps premium quality 
       streamUrl = streamUrl.replace('_96.mp4', '_320.mp4').replace('_160.mp4', '_320.mp4');
 
-      // 4. Return a backward-compatible stream using a clean PassThrough for perfect FFmpeg ingestion on Node 24
-      const streamRes = await axios.get(streamUrl, { 
-        responseType: 'stream',
-        validateStatus: () => true, // Never throw on 403, we will handle it manually
-        headers: { 'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 11; SM-G991B)' } // Native Android App spoofing
-      });
-      
-      if (streamRes.status !== 200) {
-        // We know exactly what the error is now!
-        const queue = this.context.player.nodes.get(info.guildId);
-        if (queue && queue.metadata && queue.metadata.channel) {
-           queue.metadata.channel.send(`⚠️ JioSaavn Datacenter Blocked MP4 Download. Status: ${streamRes.status}`);
-        }
-        throw new Error(`JioSaavn CDN returned ${streamRes.status}`);
-      }
-
-      const pt = new PassThrough();
-      streamRes.data.pipe(pt);
-      return pt;
+      // 4. Return the raw string URL to let discord-player's native FFmpeg handle the download directly!
+      // This bypasses Node 24 stream incompatibility and avoids Akamai's browser-spoofing Datacenter checks.
+      return streamUrl;
     } catch (error) {
       console.error('🔥 CRITICAL ERROR IN JIOSAAVN STREAM:', error);
+      try {
+        const queue = this.context.player.nodes.get(info.guildId);
+        if (queue && queue.metadata && queue.metadata.channel) {
+           queue.metadata.channel.send(`⚠️ JioSaavn Stream Error: ${error.message}`);
+        }
+      } catch(e) {}
       throw error;
     }
   }
