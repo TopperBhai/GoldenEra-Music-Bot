@@ -36,7 +36,6 @@ export default {
 
       const player = useMainPlayer();
       const result = await player.play(member.voice.channel, searchQuery, {
-        searchEngine: QueryType.SOUNDCLOUD,
         nodeOptions: {
           metadata: interaction,
           volume: 80,

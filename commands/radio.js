@@ -27,7 +27,6 @@ export default {
       // Play the first song immediately
       firstSongDetails = shuffled[0];
       const firstResult = await player.play(member.voice.channel, `${firstSongDetails.title} ${firstSongDetails.artist}`, {
-        searchEngine: QueryType.SOUNDCLOUD,
         nodeOptions: {
           metadata: interaction,
           volume: 80,
@@ -46,7 +45,6 @@ export default {
         const song = shuffled[i];
         try {
           await player.play(member.voice.channel, `${song.title} ${song.artist}`, {
-            searchEngine: QueryType.SOUNDCLOUD,
             nodeOptions: { metadata: interaction } // don't need full options for subsequent tracks
           });
           addedCount++;
