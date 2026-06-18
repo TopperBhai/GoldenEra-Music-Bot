@@ -91,7 +91,10 @@ export class JioSaavnExtractor extends BaseExtractor {
       streamUrl = streamUrl.replace('_96.mp4', '_320.mp4').replace('_160.mp4', '_320.mp4');
 
       // 4. Return a backward-compatible stream using axios for Render's older Node version
-      const streamRes = await axios.get(streamUrl, { responseType: 'stream' });
+      const streamRes = await axios.get(streamUrl, { 
+        responseType: 'stream',
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' }
+      });
       return streamRes.data;
     } catch (error) {
       console.error('🔥 CRITICAL ERROR IN JIOSAAVN STREAM:', error);
