@@ -62,10 +62,15 @@ import fs from 'fs';
 // Read cookies securely for play-dl bypass
 if (fs.existsSync('./cookies.txt')) {
   try {
-    const rawCookies = fs.readFileSync('./cookies.txt', 'utf8');
+    const lines = fs.readFileSync('./cookies.txt', 'utf8').split('\n');
+    const cookieStr = lines.map(l => {
+      const p = l.split('\t');
+      if (p.length >= 7 && p[0].includes('.youtube.com')) return `${p[5]}=${p[6].trim()}`;
+    }).filter(Boolean).join('; ');
+    
     play.setToken({
       youtube: {
-        cookie: rawCookies
+        cookie: cookieStr
       }
     });
     console.log('✅ Injected cookies into play-dl successfully!');
