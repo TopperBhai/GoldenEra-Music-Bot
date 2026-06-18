@@ -80,7 +80,7 @@ client.manager.on('playerStart', (player, track) => console.log(`▶️ Started 
 client.manager.on('playerEnd', (player, track) => console.log(`⏹️ Finished playing: ${track.title}`));
 client.manager.on('playerEmpty', player => {
   console.log(`🈳 Queue empty for ${player.guildId}.`);
-  player.destroy();
+  // Do NOT destroy the player here. Let it stay in the voice channel to prevent reconnection bugs.
 });
 client.manager.on('playerClosed', (player, data) => console.warn(`⚠️ Player closed:`, data));
 client.manager.on('playerStuck', (player, data) => console.error(`❌ Player stuck:`, data));
