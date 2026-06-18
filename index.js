@@ -74,7 +74,7 @@ try {
 // Register extractors
 await player.extractors.loadDefault();
 await player.extractors.register(YoutubeiExtractor, {
-  authentication: cookieStr
+  cookie: cookieStr
 });
 console.log('✅ Extractors registered successfully!');
 
