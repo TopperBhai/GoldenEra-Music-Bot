@@ -11,8 +11,8 @@ export class JioSaavnExtractor extends BaseExtractor {
   }
 
   async validate(query, type) {
-    // Handle text searches natively to ensure we only get original Hindi tracks
-    return type === 'AUTO' || !query.startsWith('http');
+    // Handle text searches natively, and also accept JioSaavn track URLs during stream resolution
+    return type === 'AUTO' || !query.startsWith('http') || query.includes('jiosaavn.com') || query.includes('saavn.com');
   }
 
   async handle(query, context) {
