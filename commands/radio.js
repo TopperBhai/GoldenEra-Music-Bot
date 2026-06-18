@@ -1,14 +1,12 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { getQueue } from '../utils/musicPlayer.js';
-import { getAllSongs, getRandomSong } from '../data/playlists.js';
+import { getAllSongs } from '../data/playlists.js';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('radio')
-    .setDescription('Nonstop old songs until stopped'),
+    .setDescription('Nonstop old songs (queues 10 random classics)'),
     
   async execute(interaction) {
-    // Check if user is in a voice channel
     const member = interaction.member;
     if (!member.voice.channel) {
       return interaction.reply({
@@ -20,79 +18,83 @@ export default {
     await interaction.deferReply();
 
     try {
-      const queue = getQueue(interaction.guildId);
-      
-      // Connect to voice channel if not connected
-      if (!queue.connection) {
-        await queue.connect(member.voice.channel);
-      }
+      const player = await interaction.client.manager.createPlayer({
+        guildId: interaction.guildId,
+        textId: interaction.channelId,
+        voiceId: member.voice.channel.id,
+        volume: 50,
+        deaf: true
+      });
 
-      // Enable radio mode
-      queue.setRadioMode(true);
-
-      // Get all songs and add 5 random songs to queue
       const allSongs = getAllSongs();
-      for (let i = 0; i < 5; i++) {
+      let firstTrack = null;
+      let firstSongDetails = null;
+
+      // Queue 10 random songs
+      for (let i = 0; i < 10; i++) {
         const randomSong = allSongs[Math.floor(Math.random() * allSongs.length)];
-        await queue.addToQueue(randomSong);
+        const searchQuery = `${randomSong.title} ${randomSong.artist}`;
+        const res = await interaction.client.manager.search(searchQuery, { requester: interaction.user });
+        
+        if (res.tracks.length) {
+          const track = res.tracks[0];
+          player.queue.add(track);
+          if (i === 0) {
+            firstTrack = track;
+            firstSongDetails = randomSong;
+          }
+        }
       }
 
-      // If not playing, start
-      if (!queue.isPlaying) {
-        const nowPlaying = await queue.playSong(queue.queue.shift());
-        
-        if (nowPlaying) {
-          const embed = new EmbedBuilder()
-            .setColor('#E91E63')
-            .setTitle('📻 GoldenEra Radio - ON AIR')
-            .setDescription(`**${nowPlaying.title}**\n${nowPlaying.artist} • ${nowPlaying.year}`)
-            .addFields({ name: '🎵 Mode', value: 'Non-stop classics playing...' })
-            .setFooter({ text: 'Use /stop to turn off radio' })
-            .setTimestamp();
+      if (!player.playing && !player.paused) {
+        player.play();
+      }
 
-          if (nowPlaying.thumbnail) {
-            embed.setThumbnail(nowPlaying.thumbnail);
-          }
-
-          const buttons = new ActionRowBuilder()
-            .addComponents(
-              new ButtonBuilder()
-                .setCustomId('pause')
-                .setLabel('Pause')
-                .setEmoji('⏸️')
-                .setStyle(ButtonStyle.Secondary),
-              new ButtonBuilder()
-                .setCustomId('resume')
-                .setLabel('Resume')
-                .setEmoji('▶️')
-                .setStyle(ButtonStyle.Success),
-              new ButtonBuilder()
-                .setCustomId('skip')
-                .setLabel('Skip')
-                .setEmoji('⏭️')
-                .setStyle(ButtonStyle.Primary),
-              new ButtonBuilder()
-                .setCustomId('stop')
-                .setLabel('Stop Radio')
-                .setEmoji('⏹️')
-                .setStyle(ButtonStyle.Danger)
-            );
-
-          return interaction.editReply({ embeds: [embed], components: [buttons] });
-        }
-      } else {
+      if (firstTrack) {
         const embed = new EmbedBuilder()
           .setColor('#E91E63')
-          .setTitle('📻 Radio Mode Activated')
-          .setDescription('Non-stop classics will play after current queue ends.')
+          .setTitle('📻 GoldenEra Radio - ON AIR')
+          .setDescription(`**${firstSongDetails.title}**\n${firstSongDetails.artist} • ${firstSongDetails.year}`)
+          .addFields({ name: '🎵 Mode', value: 'Queued 10 random classics!' })
+          .setFooter({ text: 'Use /stop to turn off radio' })
           .setTimestamp();
 
-        return interaction.editReply({ embeds: [embed] });
+        if (firstTrack.thumbnail) {
+          embed.setThumbnail(firstTrack.thumbnail);
+        }
+
+        const buttons = new ActionRowBuilder()
+          .addComponents(
+            new ButtonBuilder()
+              .setCustomId('pause')
+              .setLabel('Pause')
+              .setEmoji('⏸️')
+              .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+              .setCustomId('resume')
+              .setLabel('Resume')
+              .setEmoji('▶️')
+              .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+              .setCustomId('skip')
+              .setLabel('Skip')
+              .setEmoji('⏭️')
+              .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+              .setCustomId('stop')
+              .setLabel('Stop Radio')
+              .setEmoji('⏹️')
+              .setStyle(ButtonStyle.Danger)
+          );
+
+        return interaction.editReply({ embeds: [embed], components: [buttons] });
+      } else {
+        return interaction.editReply('❌ Radio start nahi ho paya, search failed.');
       }
 
     } catch (error) {
       console.error('Error in radio command:', error);
-      return interaction.editReply('Thoda ruk jao… yaadon ka record load ho raha hai 🎵');
+      return interaction.editReply('Thoda ruk jao… connection establish ho raha hai 🎵');
     }
   }
 };

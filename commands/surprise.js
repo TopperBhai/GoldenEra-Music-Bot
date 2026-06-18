@@ -1,5 +1,4 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { getQueue } from '../utils/musicPlayer.js';
 import { getAllSongs } from '../data/playlists.js';
 
 export default {
@@ -8,7 +7,6 @@ export default {
     .setDescription('Play a legendary random old song'),
     
   async execute(interaction) {
-    // Check if user is in a voice channel
     const member = interaction.member;
     if (!member.voice.channel) {
       return interaction.reply({
@@ -20,77 +18,76 @@ export default {
     await interaction.deferReply();
 
     try {
-      const queue = getQueue(interaction.guildId);
-      
-      // Connect to voice channel if not connected
-      if (!queue.connection) {
-        await queue.connect(member.voice.channel);
-      }
-
-      // Get all songs and pick a random one
       const allSongs = getAllSongs();
       const song = allSongs[Math.floor(Math.random() * allSongs.length)];
-      
-      // Use addAndPlay - plays immediately if nothing is playing, or adds to queue
-      const nowPlaying = await queue.addAndPlay(song);
+      const searchQuery = `${song.title} ${song.artist}`;
 
-      if (nowPlaying) {
-        const embed = new EmbedBuilder()
-          .setColor('#9C27B0')
-          .setTitle('🎲 Surprise Song!')
-          .setDescription(`**${nowPlaying.title}**\n${nowPlaying.artist} • ${nowPlaying.year}`)
-          .setFooter({ text: 'Yeh surprise acha laga? ✨' })
-          .setTimestamp();
+      const player = await interaction.client.manager.createPlayer({
+        guildId: interaction.guildId,
+        textId: interaction.channelId,
+        voiceId: member.voice.channel.id,
+        volume: 50,
+        deaf: true
+      });
 
-        if (nowPlaying.thumbnail) {
-          embed.setThumbnail(nowPlaying.thumbnail);
-        }
+      const res = await interaction.client.manager.search(searchQuery, { requester: interaction.user });
 
-        const buttons = new ActionRowBuilder()
-          .addComponents(
-            new ButtonBuilder()
-              .setCustomId('pause')
-              .setLabel('Pause')
-              .setEmoji('⏸️')
-              .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-              .setCustomId('resume')
-              .setLabel('Resume')
-              .setEmoji('▶️')
-              .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-              .setCustomId('skip')
-              .setLabel('Skip')
-              .setEmoji('⏭️')
-              .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-              .setCustomId('loop')
-              .setLabel('Loop')
-              .setEmoji('🔁')
-              .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-              .setCustomId('stop')
-              .setLabel('Stop')
-              .setEmoji('⏹️')
-              .setStyle(ButtonStyle.Danger)
-          );
-
-        return interaction.editReply({ embeds: [embed], components: [buttons] });
-      } else {
-        // Song was added to queue
-        const embed = new EmbedBuilder()
-          .setColor('#9C27B0')
-          .setTitle('🎲 Surprise Added to Queue!')
-          .setDescription(`**${song.title}**\n${song.artist} • ${song.year}`)
-          .setFooter({ text: 'Queue mein add ho gaya! 🎵' })
-          .setTimestamp();
-
-        return interaction.editReply({ embeds: [embed] });
+      if (!res.tracks.length) {
+        return interaction.editReply('❌ Kuch nahi mila! Cannot find the surprise song.');
       }
+
+      const track = res.tracks[0];
+      player.queue.add(track);
+
+      if (!player.playing && !player.paused) {
+        player.play();
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor('#9C27B0')
+        .setTitle('🎲 Surprise Song!')
+        .setDescription(`**${song.title}**\n${song.artist} • ${song.year}`)
+        .setFooter({ text: 'Yeh surprise acha laga? ✨' })
+        .setTimestamp();
+
+      if (track.thumbnail) {
+        embed.setThumbnail(track.thumbnail);
+      }
+
+      const buttons = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId('pause')
+            .setLabel('Pause')
+            .setEmoji('⏸️')
+            .setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder()
+            .setCustomId('resume')
+            .setLabel('Resume')
+            .setEmoji('▶️')
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId('skip')
+            .setLabel('Skip')
+            .setEmoji('⏭️')
+            .setStyle(ButtonStyle.Primary),
+          new ButtonBuilder()
+            .setCustomId('loop')
+            .setLabel('Loop')
+            .setEmoji('🔁')
+            .setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder()
+            .setCustomId('stop')
+            .setLabel('Stop')
+            .setEmoji('⏹️')
+            .setStyle(ButtonStyle.Danger)
+        );
+
+      return interaction.editReply({ embeds: [embed], components: [buttons] });
 
     } catch (error) {
       console.error('Error in surprise command:', error);
-      return interaction.editReply('Thoda ruk jao… yaadon ka record load ho raha hai 🎵');
+      return interaction.editReply('Thoda ruk jao… connection establish ho raha hai 🎵');
     }
   }
 };
