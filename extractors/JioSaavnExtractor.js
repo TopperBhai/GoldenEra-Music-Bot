@@ -1,6 +1,6 @@
 import { BaseExtractor, Track } from 'discord-player';
 import CryptoJS from 'crypto-js';
-import { Readable } from 'stream';
+import { Readable, PassThrough } from 'stream';
 import axios from 'axios';
 
 export class JioSaavnExtractor extends BaseExtractor {
@@ -90,12 +90,15 @@ export class JioSaavnExtractor extends BaseExtractor {
       // 3. Force 320kbps premium quality 
       streamUrl = streamUrl.replace('_96.mp4', '_320.mp4').replace('_160.mp4', '_320.mp4');
 
-      // 4. Return a backward-compatible stream using axios for Render's older Node version
+      // 4. Return a backward-compatible stream using a clean PassThrough for perfect FFmpeg ingestion on Node 24
       const streamRes = await axios.get(streamUrl, { 
         responseType: 'stream',
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' }
       });
-      return streamRes.data;
+      
+      const pt = new PassThrough();
+      streamRes.data.pipe(pt);
+      return pt;
     } catch (error) {
       console.error('🔥 CRITICAL ERROR IN JIOSAAVN STREAM:', error);
       throw error;
