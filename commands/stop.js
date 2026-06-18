@@ -12,7 +12,7 @@ export default {
     }
     
     player.queue.clear();
-    player.stop();
+    player.skip();
     return interaction.reply('⏹️ Music band ho gayi aur queue clear ho gaya.');
   }
 };

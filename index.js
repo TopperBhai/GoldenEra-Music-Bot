@@ -200,7 +200,7 @@ client.on('interactionCreate', async interaction => {
 
         case 'stop':
           player.queue.clear();
-          player.stop();
+          player.skip();
           await interaction.reply({ content: '⏹️ Music band ho gayi.', ephemeral: true });
           break;
 
