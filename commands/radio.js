@@ -26,6 +26,8 @@ export default {
 
       // Helper function to prepare track
       const youtubedl = (await import('youtube-dl-exec')).default;
+      const fs = await import('fs');
+      const path = await import('path');
       const getTrack = async (songDetails) => {
         const ytSearch = await player.search(`${songDetails.title} ${songDetails.artist}`, {
           requestedBy: interaction.user,
@@ -35,14 +37,20 @@ export default {
         let track = ytSearch.tracks[0];
         
         try {
-          const ytdlOutput = await youtubedl(track.url, {
+          const cookiesPath = path.join(process.cwd(), 'cookies.txt');
+          const ytdlOptions = {
             dumpSingleJson: true,
             noWarnings: true,
             noCallHome: true,
             noCheckCertificate: true,
             youtubeSkipDashManifest: true,
             format: 'bestaudio',
-          });
+          };
+          if (fs.existsSync(cookiesPath)) {
+            ytdlOptions.cookies = cookiesPath;
+          }
+
+          const ytdlOutput = await youtubedl(track.url, ytdlOptions);
           track.rawUrl = ytdlOutput.url;
         } catch(e) {
           console.error(e);

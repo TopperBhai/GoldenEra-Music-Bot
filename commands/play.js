@@ -50,21 +50,29 @@ export default {
       // Bypass YouTube IP blocks by directly fetching the raw media stream URL using yt-dlp
       await interaction.editReply('⏳ Bypassing YouTube stream blocks...');
       const youtubedl = (await import('youtube-dl-exec')).default;
+      const fs = await import('fs');
+      const path = await import('path');
       
       let rawUrl = '';
       try {
-        const ytdlOutput = await youtubedl(trackToPlay.url, {
+        const cookiesPath = path.join(process.cwd(), 'cookies.txt');
+        const ytdlOptions = {
           dumpSingleJson: true,
           noWarnings: true,
           noCallHome: true,
           noCheckCertificate: true,
           youtubeSkipDashManifest: true,
           format: 'bestaudio',
-        });
+        };
+        if (fs.existsSync(cookiesPath)) {
+          ytdlOptions.cookies = cookiesPath;
+        }
+
+        const ytdlOutput = await youtubedl(trackToPlay.url, ytdlOptions);
         rawUrl = ytdlOutput.url;
       } catch (e) {
         console.error('yt-dlp error:', e);
-        return interaction.editReply('❌ Stream link extract nahi kar paya.');
+        return interaction.editReply('❌ Stream link extract nahi kar paya. YouTube blocked the connection.');
       }
 
       // Play the raw URL
