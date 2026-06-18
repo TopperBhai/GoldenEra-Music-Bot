@@ -48,6 +48,21 @@ client.commands = new Collection();
 
 import { BridgeProvider, BridgeSource } from '@discord-player/extractor';
 
+// --- STARTUP DIAGNOSTICS ---
+try {
+  const opus = await import('@discordjs/opus');
+  console.log('✅ @discordjs/opus loaded successfully (native C++ bindings)');
+} catch(e) {
+  console.warn('⚠️ @discordjs/opus NOT available:', e.message, '- falling back to opusscript (may crash on Node 24)');
+}
+try {
+  const ffmpegStatic = await import('ffmpeg-static');
+  console.log('✅ ffmpeg-static binary path:', ffmpegStatic.default);
+} catch(e) {
+  console.warn('⚠️ ffmpeg-static NOT available:', e.message);
+}
+// ---------------------------
+
 // --- DISCORD-PLAYER SETUP ---
 const player = new Player(client, {
   ytdlOptions: {
@@ -62,6 +77,10 @@ import { JioSaavnExtractor } from './extractors/JioSaavnExtractor.js';
 await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor' && ext !== 'SpotifyExtractor' && ext !== 'SoundCloudExtractor');
 await player.extractors.register(JioSaavnExtractor, {});
 console.log('✅ Custom JioSaavn Engine initialized successfully!');
+
+// --- DEBUG LOGGING (will reveal exactly where 'The operation was aborted' originates) ---
+player.on('debug', (msg) => console.log(`[Player Debug] ${msg}`));
+player.events.on('debug', (queue, msg) => console.log(`[Queue Debug] ${msg}`));
 
 // --- Player Events ---
 player.events.on('playerStart', (queue, track) => {
