@@ -56,11 +56,26 @@ const player = new Player(client, {
   }
 });
 
-import { JiosaavnExtractor } from 'discord-player-jiosaavn';
+import play from 'play-dl';
+import fs from 'fs';
+
+// Read cookies securely for play-dl bypass
+if (fs.existsSync('./cookies.txt')) {
+  try {
+    const rawCookies = fs.readFileSync('./cookies.txt', 'utf8');
+    play.setToken({
+      youtube: {
+        cookie: rawCookies
+      }
+    });
+    console.log('✅ Injected cookies into play-dl successfully!');
+  } catch (e) {
+    console.log('⚠️ Failed to inject cookies into play-dl.');
+  }
+}
 
 // Register extractors
-await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
-await player.extractors.register(JiosaavnExtractor, {});
+await player.extractors.loadDefault();
 console.log('✅ Extractors registered successfully!');
 
 // --- Player Events ---

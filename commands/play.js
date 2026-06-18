@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { useMainPlayer, QueryType } from 'discord-player';
 import { playlists, getRandomSong } from '../data/playlists.js';
+import play from 'play-dl';
 
 export default {
   data: new SlashCommandBuilder()
@@ -35,13 +36,10 @@ export default {
         isCategory = true;
       }
 
-      // 1. Route search intelligently to JioSaavn for original Bollywood tracks
-      const isUrl = /^https?:\/\//.test(searchQuery);
-      const engine = isUrl ? QueryType.AUTO : 'ext:dp.lpal.jiosaavn';
-
+      // 1. Search YouTube first to get accurate metadata (Hindi songs need this)
       let ytSearch = await player.search(searchQuery, {
         requestedBy: interaction.user,
-        searchEngine: engine
+        searchEngine: QueryType.YOUTUBE
       });
 
       if (!ytSearch || !ytSearch.tracks.length) {
@@ -50,7 +48,7 @@ export default {
 
       let trackToPlay = ytSearch.tracks[0];
 
-      // Play the track directly
+      // Play the track directly with the play-dl custom stream interceptor
       const result = await player.play(member.voice.channel, trackToPlay, {
         nodeOptions: {
           metadata: interaction,
@@ -58,7 +56,13 @@ export default {
           leaveOnEmpty: true,
           leaveOnEmptyCooldown: 60000,
           leaveOnEnd: false,
-          selfDeaf: true
+          selfDeaf: true,
+          onBeforeCreateStream: async (track, source, _queue) => {
+            if (source === "youtube") {
+              const stream = await play.stream(track.url, { discordPlayerCompatibility: true });
+              return stream.stream;
+            }
+          }
         }
       });
 
@@ -67,10 +71,10 @@ export default {
       const author = isCategory && songDetails ? songDetails.artist : track.author;
 
       const embed = new EmbedBuilder()
-        .setColor('#2BC5B4') // JioSaavn Teal Color
+        .setColor('#FF0000') // YouTube Red
         .setTitle('🎶 Now Playing')
         .setDescription(`**${title}**\n${author}`)
-        .setFooter({ text: isCategory && songDetails?.message ? songDetails.message : `Source: JioSaavn Originals • ${track.duration}` })
+        .setFooter({ text: isCategory && songDetails?.message ? songDetails.message : `Source: YouTube Originals • ${track.duration}` })
         .setTimestamp();
 
       if (track.thumbnail) {
