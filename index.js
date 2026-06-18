@@ -62,22 +62,16 @@ const Nodes = [
     secure: false
   },
   {
-    name: 'SSRR Node',
-    url: 'node.ssrr.app:80',
-    auth: 'ssrr.app',
+    name: 'G3V Node',
+    url: 'lava.g3v.co.uk:9008',
+    auth: 'lavalinklol',
     secure: false
   },
   {
-    name: 'Kitsune Node',
-    url: 'lavalink.kitsune.si:443',
-    auth: 'youshallnotpass',
+    name: 'Trinium Node',
+    url: 'lavalink-v4.triniumhost.com:443',
+    auth: 'free',
     secure: true
-  },
-  {
-    name: 'Oops Node',
-    url: 'lavalink.oops.wtf:2000',
-    auth: 'www.freelavalink.rest',
-    secure: false
   }
 ];
 
@@ -226,6 +220,25 @@ client.on('interactionCreate', async interaction => {
           player.queue.clear();
           player.skip();
           await interaction.reply({ content: '⏹️ Music band ho gayi.', ephemeral: true });
+          break;
+
+        case 'switch_node':
+          const current = player.shoukaku.node.name;
+          const ideal = client.manager.shoukaku.getIdealNode();
+          if (ideal && ideal.name !== current) {
+            player.shoukaku.moveNode(ideal.name);
+            await interaction.reply({ content: `🔄 Switched audio stream to ${ideal.name}!`, ephemeral: true });
+          } else {
+            // Force move to another node even if it's not "ideal"
+            const otherNodes = client.manager.shoukaku.nodes.filter(n => n.name !== current && n.state === 2);
+            if (otherNodes.size > 0) {
+              const fallback = otherNodes.first();
+              player.shoukaku.moveNode(fallback.name);
+              await interaction.reply({ content: `🔄 Switched audio stream to ${fallback.name}!`, ephemeral: true });
+            } else {
+              await interaction.reply({ content: `❌ No other backup servers available right now.`, ephemeral: true });
+            }
+          }
           break;
 
         default:
