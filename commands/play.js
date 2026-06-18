@@ -35,10 +35,13 @@ export default {
         isCategory = true;
       }
 
-      // 1. Search Spotify for accurate studio metadata and album covers
+      // 1. Route search intelligently to avoid anonymous Spotify API rate limits
+      const isUrl = /^https?:\/\//.test(searchQuery);
+      const engine = isUrl ? QueryType.AUTO : QueryType.SOUNDCLOUD_SEARCH;
+
       let ytSearch = await player.search(searchQuery, {
         requestedBy: interaction.user,
-        searchEngine: QueryType.SPOTIFY_SEARCH
+        searchEngine: engine
       });
 
       if (!ytSearch || !ytSearch.tracks.length) {
