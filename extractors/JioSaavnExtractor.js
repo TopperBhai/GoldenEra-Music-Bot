@@ -1,5 +1,7 @@
 import { BaseExtractor, Track } from 'discord-player';
 import CryptoJS from 'crypto-js';
+import { spawn } from 'child_process';
+import ffmpegPath from 'ffmpeg-static';
 
 
 export class JioSaavnExtractor extends BaseExtractor {
@@ -90,9 +92,23 @@ export class JioSaavnExtractor extends BaseExtractor {
       // 3. Force 320kbps premium quality 
       streamUrl = streamUrl.replace('_96.mp4', '_320.mp4').replace('_160.mp4', '_320.mp4');
 
-      // 4. Return the raw string URL to let discord-player's native FFmpeg handle the download directly!
-      // This allows FFmpeg to perform HTTP range requests to find the MP4 MOOV atom, preventing silent streams.
-      return streamUrl;
+      // 4. Spawn a native FFmpeg process to download the MP4 using Android spoofing headers.
+      // FFmpeg HTTP demuxer natively supports Range requests, meaning it can instantly seek the MP4 MOOV atom at the end of the file.
+      // We then transmux the decoded audio to MP3 and pipe it to discord-player, which solves all streaming issues.
+      const ffmpegArgs = [
+        '-headers', 'User-Agent: Dalvik/2.1.0 (Linux; U; Android 11; SM-G991B)\r\n',
+        '-i', streamUrl,
+        '-f', 'mp3',
+        '-ac', '2',
+        '-ar', '48000',
+        'pipe:1'
+      ];
+      
+      const ffmpeg = spawn(ffmpegPath, ffmpegArgs);
+      
+      // discord-player will automatically consume and destroy this readable stream when the song ends or skips,
+      // which safely closes the ffmpeg process.
+      return ffmpeg.stdout;
     } catch (error) {
       console.error('🔥 CRITICAL ERROR IN JIOSAAVN STREAM:', error);
       try {
