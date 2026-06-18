@@ -56,32 +56,12 @@ const player = new Player(client, {
   }
 });
 
-import play from 'play-dl';
-import fs from 'fs';
+import { JioSaavnExtractor } from './extractors/JioSaavnExtractor.js';
 
-// Read cookies securely for play-dl bypass
-if (fs.existsSync('./cookies.txt')) {
-  try {
-    const lines = fs.readFileSync('./cookies.txt', 'utf8').split('\n');
-    const cookieStr = lines.map(l => {
-      const p = l.split('\t');
-      if (p.length >= 7 && p[0].includes('.youtube.com')) return `${p[5]}=${p[6].trim()}`;
-    }).filter(Boolean).join('; ');
-    
-    play.setToken({
-      youtube: {
-        cookie: cookieStr
-      }
-    });
-    console.log('✅ Injected cookies into play-dl successfully!');
-  } catch (e) {
-    console.log('⚠️ Failed to inject cookies into play-dl.');
-  }
-}
-
-// Register extractors
-await player.extractors.loadDefault();
-console.log('✅ Extractors registered successfully!');
+// Register our completely custom native JioSaavn engine and disable everything else that crashes
+await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor' && ext !== 'SpotifyExtractor' && ext !== 'SoundCloudExtractor');
+await player.extractors.register(JioSaavnExtractor, {});
+console.log('✅ Custom JioSaavn Engine initialized successfully!');
 
 // --- Player Events ---
 player.events.on('playerStart', (queue, track) => {
