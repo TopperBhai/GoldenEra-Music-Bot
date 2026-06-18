@@ -74,7 +74,11 @@ try {
 // Register extractors
 await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
 await player.extractors.register(YoutubeiExtractor, {
-  cookie: cookieStr
+  cookie: cookieStr,
+  generateWithPoToken: true,
+  streamOptions: {
+    useClient: 'WEB'
+  }
 });
 console.log('✅ Extractors registered successfully!');
 
