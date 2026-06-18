@@ -11,7 +11,8 @@ export default {
       return interaction.reply({ content: '❌ Yahan koi gaana nahi chal raha.', ephemeral: true });
     }
     
-    player.destroy();
+    player.queue.clear();
+    player.stop();
     return interaction.reply('⏹️ Music band ho gayi aur queue clear ho gaya.');
   }
 };
