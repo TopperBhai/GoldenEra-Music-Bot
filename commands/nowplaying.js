@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { useQueue } from 'discord-player';
 
 export default {
   data: new SlashCommandBuilder()
@@ -6,17 +7,17 @@ export default {
     .setDescription('Show current song details'),
     
   async execute(interaction) {
-    const player = interaction.client.manager.players.get(interaction.guildId);
+    const queue = useQueue(interaction.guildId);
     
-    if (!player || !player.queue.current) {
+    if (!queue || !queue.currentTrack) {
       return interaction.reply({
         content: '❌ Abhi koi gaana nahi chal raha hai.',
         flags: 64
       });
     }
 
-    const song = player.queue.current;
-    const queueLength = player.queue.length;
+    const song = queue.currentTrack;
+    const queueLength = queue.tracks.size;
     
     const embed = new EmbedBuilder()
       .setColor('#00BCD4')
@@ -26,7 +27,7 @@ export default {
         { name: '🎤 Artist', value: song.author || 'Unknown', inline: true },
         { name: '📋 Queue', value: `${queueLength} songs`, inline: true }
       )
-      .setFooter({ text: player.paused ? '⏸️ Paused' : '▶️ Playing' })
+      .setFooter({ text: queue.node.isPaused() ? '⏸️ Paused' : `▶️ Playing • ${song.duration}` })
       .setTimestamp();
 
     if (song.thumbnail) {

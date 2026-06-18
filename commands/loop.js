@@ -1,4 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
+import { useQueue } from 'discord-player';
 
 export default {
   data: new SlashCommandBuilder()
@@ -6,16 +7,17 @@ export default {
     .setDescription('Toggle loop mode'),
     
   async execute(interaction) {
-    const player = interaction.client.manager.players.get(interaction.guildId);
-    if (!player) {
+    const queue = useQueue(interaction.guildId);
+    if (!queue || !queue.isPlaying()) {
       return interaction.reply({ content: '❌ Yahan koi gaana nahi chal raha.', flags: 64 });
     }
     
-    if (player.loop === 'none') {
-      player.setLoop('track');
+    // 0 = Off, 1 = Track, 2 = Queue, 3 = Autoplay
+    if (queue.repeatMode === 0) {
+      queue.setRepeatMode(1);
       return interaction.reply('🔁 Loop mode ON - Yeh gaana repeat hota rahega!');
     } else {
-      player.setLoop('none');
+      queue.setRepeatMode(0);
       return interaction.reply('🔁 Loop mode OFF');
     }
   }

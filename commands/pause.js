@@ -1,4 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
+import { useQueue } from 'discord-player';
 
 export default {
   data: new SlashCommandBuilder()
@@ -6,16 +7,16 @@ export default {
     .setDescription('Pause the current song'),
     
   async execute(interaction) {
-    const player = interaction.client.manager.players.get(interaction.guildId);
-    if (!player) {
+    const queue = useQueue(interaction.guildId);
+    if (!queue || !queue.isPlaying()) {
       return interaction.reply({ content: '❌ Yahan koi gaana nahi chal raha.', flags: 64 });
     }
     
-    if (player.paused) {
+    if (queue.node.isPaused()) {
       return interaction.reply({ content: '❌ Gaana pehle se hi ruka hua hai.', flags: 64 });
     }
     
-    player.pause(true);
+    queue.node.pause();
     return interaction.reply('⏸️ Gaana roka gaya.');
   }
 };

@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { useMainPlayer } from 'discord-player';
 import { playlists, getRandomSong } from '../data/playlists.js';
 
 export default {
@@ -33,26 +34,19 @@ export default {
       const song = getRandomSong(playlist);
       const searchQuery = `${song.title} ${song.artist}`;
 
-      const player = await interaction.client.manager.createPlayer({
-        guildId: interaction.guildId,
-        textId: interaction.channelId,
-        voiceId: member.voice.channel.id,
-        volume: 100, deaf: true, mute: false
+      const player = useMainPlayer();
+      const result = await player.play(member.voice.channel, searchQuery, {
+        nodeOptions: {
+          metadata: interaction,
+          volume: 80,
+          leaveOnEmpty: true,
+          leaveOnEmptyCooldown: 60000,
+          leaveOnEnd: false,
+          selfDeaf: true
+        }
       });
 
-      // SoundCloud first (reliable streaming), then YouTube Music fallback
-      let res = await interaction.client.manager.search(`scsearch:${searchQuery}`, { requester: interaction.user }).catch(() => null);
-      if (!res?.tracks?.length) {
-        res = await interaction.client.manager.search(`ytmsearch:${searchQuery}`, { requester: interaction.user }).catch(() => null);
-      }
-
-      if (!res?.tracks?.length) {
-        return interaction.editReply('❌ Mood song nahi mila! Dobara try karo.');
-      }
-
-      const track = res.tracks[0];
-      player.queue.add(track);
-      if (!player.playing && !player.paused) player.play();
+      const track = result.track;
 
       const moodMessages = {
         sad: 'Dard bhi ek ehsaas hai… 💔',

@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { useMainPlayer } from 'discord-player';
 import { getAllSongs } from '../data/playlists.js';
 
 export default {
@@ -15,46 +16,42 @@ export default {
     await interaction.deferReply();
 
     try {
-      const player = await interaction.client.manager.createPlayer({
-        guildId: interaction.guildId,
-        textId: interaction.channelId,
-        voiceId: member.voice.channel.id,
-        volume: 100, deaf: true, mute: false
-      });
-
+      const player = useMainPlayer();
       const allSongs = getAllSongs();
+      const shuffled = [...allSongs].sort(() => Math.random() - 0.5).slice(0, 10);
+      
       let firstTrack = null;
       let firstSongDetails = null;
       let addedCount = 0;
 
-      const shuffled = [...allSongs].sort(() => Math.random() - 0.5).slice(0, 10);
-
-      // Search all 10 songs in parallel via SoundCloud (reliable streaming)
-      const searchPromises = shuffled.map(song => {
-        const q = `${song.title} ${song.artist}`;
-        return interaction.client.manager.search(`scsearch:${q}`, { requester: interaction.user })
-          .then(res => ({ res, song }))
-          .catch(() => ({ res: null, song }));
+      // Play the first song immediately
+      firstSongDetails = shuffled[0];
+      const firstResult = await player.play(member.voice.channel, `${firstSongDetails.title} ${firstSongDetails.artist}`, {
+        nodeOptions: {
+          metadata: interaction,
+          volume: 80,
+          leaveOnEmpty: true,
+          leaveOnEmptyCooldown: 60000,
+          leaveOnEnd: false,
+          selfDeaf: true
+        }
       });
+      
+      firstTrack = firstResult.track;
+      addedCount++;
 
-      const results = await Promise.all(searchPromises);
-
-      for (const { res, song } of results) {
-        if (res?.tracks?.length) {
-          player.queue.add(res.tracks[0]);
+      // Queue the rest in the background
+      for (let i = 1; i < shuffled.length; i++) {
+        const song = shuffled[i];
+        try {
+          await player.play(member.voice.channel, `${song.title} ${song.artist}`, {
+            nodeOptions: { metadata: interaction } // don't need full options for subsequent tracks
+          });
           addedCount++;
-          if (!firstTrack) {
-            firstTrack = res.tracks[0];
-            firstSongDetails = song;
-          }
+        } catch (e) {
+          console.error(`Failed to queue ${song.title}`);
         }
       }
-
-      if (!firstTrack || addedCount === 0) {
-        return interaction.editReply('❌ Radio start nahi ho paya, search failed.');
-      }
-
-      if (!player.playing && !player.paused) player.play();
 
       const embed = new EmbedBuilder()
         .setColor('#E91E63')
@@ -77,7 +74,7 @@ export default {
       return interaction.editReply({ embeds: [embed], components: [buttons] });
     } catch (error) {
       console.error('Error in radio command:', error);
-      return interaction.editReply('❌ Radio mein dikkat aayi. Dobara try karo.');
+      return interaction.editReply('❌ Radio start nahi ho paya. Dobara try karo.');
     }
   }
 };

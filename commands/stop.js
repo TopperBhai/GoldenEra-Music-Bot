@@ -1,4 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
+import { useQueue } from 'discord-player';
 
 export default {
   data: new SlashCommandBuilder()
@@ -6,18 +7,12 @@ export default {
     .setDescription('Stop the music and clear the queue'),
     
   async execute(interaction) {
-    const player = interaction.client.manager.players.get(interaction.guildId);
-    if (!player) {
+    const queue = useQueue(interaction.guildId);
+    if (!queue || !queue.isPlaying()) {
       return interaction.reply({ content: '❌ Yahan koi gaana nahi chal raha.', flags: 64 });
     }
     
-    try {
-      player.queue.clear();
-      player.destroy();
-    } catch(e) {
-      console.error('Destroy failed:', e.message);
-      try { player.skip(); } catch(e2) {}
-    }
+    queue.delete();
     return interaction.reply('⏹️ Music band ho gayi aur queue clear ho gaya.');
   }
 };

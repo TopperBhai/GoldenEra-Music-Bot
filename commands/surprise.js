@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { useMainPlayer } from 'discord-player';
 import { getAllSongs } from '../data/playlists.js';
 
 export default {
@@ -15,30 +16,23 @@ export default {
     await interaction.deferReply();
 
     try {
+      const player = useMainPlayer();
       const allSongs = getAllSongs();
       const song = allSongs[Math.floor(Math.random() * allSongs.length)];
       const searchQuery = `${song.title} ${song.artist}`;
 
-      const player = await interaction.client.manager.createPlayer({
-        guildId: interaction.guildId,
-        textId: interaction.channelId,
-        voiceId: member.voice.channel.id,
-        volume: 100, deaf: true, mute: false
+      const result = await player.play(member.voice.channel, searchQuery, {
+        nodeOptions: {
+          metadata: interaction,
+          volume: 80,
+          leaveOnEmpty: true,
+          leaveOnEmptyCooldown: 60000,
+          leaveOnEnd: false,
+          selfDeaf: true
+        }
       });
 
-      // SoundCloud first (reliable streaming), then YouTube Music fallback
-      let res = await interaction.client.manager.search(`scsearch:${searchQuery}`, { requester: interaction.user }).catch(() => null);
-      if (!res?.tracks?.length) {
-        res = await interaction.client.manager.search(`ytmsearch:${searchQuery}`, { requester: interaction.user }).catch(() => null);
-      }
-
-      if (!res?.tracks?.length) {
-        return interaction.editReply('❌ Surprise song nahi mila! Dobara try karo.');
-      }
-
-      const track = res.tracks[0];
-      player.queue.add(track);
-      if (!player.playing && !player.paused) player.play();
+      const track = result.track;
 
       const embed = new EmbedBuilder()
         .setColor('#9C27B0')
