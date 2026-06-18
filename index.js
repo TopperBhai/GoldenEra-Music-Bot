@@ -60,18 +60,6 @@ const Nodes = [
     url: 'lavalink.jirayu.net:13592',
     auth: 'youshallnotpass',
     secure: false
-  },
-  {
-    name: 'G3V Node',
-    url: 'lava.g3v.co.uk:9008',
-    auth: 'lavalinklol',
-    secure: false
-  },
-  {
-    name: 'Trinium Node',
-    url: 'lavalink-v4.triniumhost.com:443',
-    auth: 'free',
-    secure: true
   }
 ];
 
