@@ -50,10 +50,10 @@ import { BridgeProvider, BridgeSource } from '@discord-player/extractor';
 
 // --- STARTUP DIAGNOSTICS ---
 try {
-  const opus = await import('@discordjs/opus');
-  console.log('✅ @discordjs/opus loaded successfully (native C++ bindings)');
+  const mp = await import('mediaplex');
+  console.log('✅ mediaplex loaded successfully (native Opus + sodium encryption)');
 } catch(e) {
-  console.warn('⚠️ @discordjs/opus NOT available:', e.message, '- falling back to opusscript (may crash on Node 24)');
+  console.warn('⚠️ mediaplex NOT available:', e.message, '- voice encoding will fail');
 }
 try {
   const ffmpegStatic = await import('ffmpeg-static');
