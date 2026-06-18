@@ -2,8 +2,8 @@ import { SlashCommandBuilder } from 'discord.js';
 
 export default {
   data: new SlashCommandBuilder()
-    .setName('resume')
-    .setDescription('Resume the paused song'),
+    .setName('loop')
+    .setDescription('Toggle loop mode'),
     
   async execute(interaction) {
     const player = interaction.client.manager.players.get(interaction.guildId);
@@ -11,11 +11,12 @@ export default {
       return interaction.reply({ content: '❌ Yahan koi gaana nahi chal raha.', ephemeral: true });
     }
     
-    if (!player.paused) {
-      return interaction.reply({ content: '❌ Gaana pehle se hi chal raha hai.', ephemeral: true });
+    if (player.loop === 'none') {
+      player.setLoop('track');
+      return interaction.reply('🔁 Loop mode ON');
+    } else {
+      player.setLoop('none');
+      return interaction.reply('🔁 Loop mode OFF');
     }
-    
-    player.pause(false);
-    return interaction.reply('▶️ Gaana phir se chalu.');
   }
 };

@@ -1,33 +1,17 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import { getQueue } from '../utils/musicPlayer.js';
+import { SlashCommandBuilder } from 'discord.js';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('skip')
-    .setDescription('Skip to the next song'),
+    .setDescription('Skip the current song'),
     
   async execute(interaction) {
-    const queue = getQueue(interaction.guildId);
+    const player = interaction.client.manager.players.get(interaction.guildId);
+    if (!player) {
+      return interaction.reply({ content: '❌ Yahan koi gaana nahi chal raha.', ephemeral: true });
+    }
     
-    if (!queue.isPlaying) {
-      return interaction.reply({
-        content: '❌ Abhi koi gaana nahi chal raha hai.',
-        ephemeral: true
-      });
-    }
-
-    if (queue.skip()) {
-      const embed = new EmbedBuilder()
-        .setColor('#2196F3')
-        .setDescription('⏭️ Chalo agle gaane par chalte hain…')
-        .setTimestamp();
-
-      return interaction.reply({ embeds: [embed] });
-    } else {
-      return interaction.reply({
-        content: '❌ Gaana skip nahi ho saka.',
-        ephemeral: true
-      });
-    }
+    player.skip();
+    return interaction.reply('⏭️ Agle gaane par…');
   }
 };

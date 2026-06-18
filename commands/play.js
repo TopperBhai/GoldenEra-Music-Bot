@@ -1,26 +1,18 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { getQueue } from '../utils/musicPlayer.js';
 import { playlists, getRandomSong } from '../data/playlists.js';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('play')
-    .setDescription('Play classic old songs')
+    .setDescription('Play a song from YouTube, search, or play a classic category')
     .addStringOption(option =>
-      option.setName('category')
-        .setDescription('Choose a category')
+      option.setName('query')
+        .setDescription('YouTube link, search term, or category (kishore, lata, 90s, old-hindi, old-english)')
         .setRequired(true)
-        .addChoices(
-          { name: '🎤 Kishore Kumar Classics', value: 'kishore' },
-          { name: '🎵 Lata Mangeshkar Hits', value: 'lata' },
-          { name: '💕 90s Bollywood Love', value: '90s' },
-          { name: '🇮🇳 Classic Hindi Songs', value: 'old-hindi' },
-          { name: '🎸 Old English Classics', value: 'old-english' }
-        )),
+    ),
         
   async execute(interaction) {
     try {
-      // Check if user is in a voice channel FIRST
       const member = interaction.member;
       if (!member.voice.channel) {
         return interaction.reply({ 
@@ -29,90 +21,99 @@ export default {
         });
       }
 
-      // Defer reply immediately after validation
       await interaction.deferReply();
       
-      const category = interaction.options.getString('category');
+      const query = interaction.options.getString('query');
+      let searchQuery = query;
+      let isCategory = false;
+      let songDetails = null;
 
-      // Get playlist
-      const playlist = playlists[category];
-      if (!playlist) {
-        return interaction.editReply('❌ Invalid category selected.');
+      // Check if the query is a classic category
+      if (playlists[query.toLowerCase()]) {
+        const playlist = playlists[query.toLowerCase()];
+        songDetails = getRandomSong(playlist);
+        searchQuery = `${songDetails.title} ${songDetails.artist}`;
+        isCategory = true;
       }
 
-      // Pick a random song from the playlist
-      const song = getRandomSong(playlist);
-      
-      const queue = getQueue(interaction.guildId);
-      
-      // Connect to voice channel if not connected
-      if (!queue.connection) {
-        try {
-          await queue.connect(member.voice.channel);
-        } catch (error) {
-          if (error.message === 'TIMEOUT') {
-            return interaction.editReply('❌ **Connection Failed!**\nI cannot connect to the voice channel. Please check the channel settings and make sure I have the **Speak** permission turned ON! If I am muted, Discord blocks my connection.');
-          }
-          throw error;
-        }
+      // Create or get Lavalink player
+      const player = await interaction.client.manager.createPlayer({
+        guildId: interaction.guildId,
+        textId: interaction.channelId,
+        voiceId: member.voice.channel.id,
+        volume: 50,
+        deaf: true
+      });
+
+      // Search for the track using Kazagumo
+      const res = await interaction.client.manager.search(searchQuery, { requester: interaction.user });
+
+      if (!res.tracks.length) {
+        return interaction.editReply('❌ Kuch nahi mila! Please try a different link or search term.');
       }
 
-      // Add song and start playing
-      const nowPlaying = await queue.addAndPlay(song);
-      
-      if (nowPlaying) {
-        const embed = new EmbedBuilder()
-          .setColor('#FFD700')
-          .setTitle('🎶 Now Playing')
-          .setDescription(`**${nowPlaying.title}**\n${nowPlaying.artist} • ${nowPlaying.year}`)
-          .setFooter({ text: nowPlaying.message })
-          .setTimestamp();
+      const track = res.tracks[0];
+      player.queue.add(track);
 
-        if (nowPlaying.thumbnail) {
-          embed.setThumbnail(nowPlaying.thumbnail);
-        }
-
-        const buttons = new ActionRowBuilder()
-          .addComponents(
-            new ButtonBuilder()
-              .setCustomId('pause')
-              .setLabel('Pause')
-              .setEmoji('⏸️')
-              .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-              .setCustomId('resume')
-              .setLabel('Resume')
-              .setEmoji('▶️')
-              .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-              .setCustomId('skip')
-              .setLabel('Skip')
-              .setEmoji('⏭️')
-              .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-              .setCustomId('loop')
-              .setLabel('Loop')
-              .setEmoji('🔁')
-              .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-              .setCustomId('stop')
-              .setLabel('Stop')
-              .setEmoji('⏹️')
-              .setStyle(ButtonStyle.Danger)
-          );
-
-        return interaction.editReply({ embeds: [embed], components: [buttons] });
-      } else {
-        return interaction.editReply('Thoda ruk jao… yaadon ka record load ho raha hai 🎵');
+      if (!player.playing && !player.paused) {
+        player.play();
       }
+
+      const title = isCategory && songDetails ? songDetails.title : track.title;
+      const author = isCategory && songDetails ? songDetails.artist : track.author;
+
+      const embed = new EmbedBuilder()
+        .setColor('#FFD700')
+        .setTitle('🎶 Now Playing')
+        .setDescription(`**${title}**\n${author}`)
+        .setTimestamp();
+
+      if (track.thumbnail) {
+        embed.setThumbnail(track.thumbnail);
+      }
+      
+      if (isCategory && songDetails && songDetails.message) {
+        embed.setFooter({ text: songDetails.message });
+      }
+
+      const buttons = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId('pause')
+            .setLabel('Pause')
+            .setEmoji('⏸️')
+            .setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder()
+            .setCustomId('resume')
+            .setLabel('Resume')
+            .setEmoji('▶️')
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId('skip')
+            .setLabel('Skip')
+            .setEmoji('⏭️')
+            .setStyle(ButtonStyle.Primary),
+          new ButtonBuilder()
+            .setCustomId('loop')
+            .setLabel('Loop')
+            .setEmoji('🔁')
+            .setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder()
+            .setCustomId('stop')
+            .setLabel('Stop')
+            .setEmoji('⏹️')
+            .setStyle(ButtonStyle.Danger)
+        );
+
+      return interaction.editReply({ embeds: [embed], components: [buttons] });
 
     } catch (error) {
       console.error('Error in play command:', error);
       if (interaction.deferred) {
-        return interaction.editReply('Thoda ruk jao… yaadon ka record load ho raha hai 🎵');
+        return interaction.editReply('Thoda ruk jao… connection establish ho raha hai 🎵');
       } else {
         return interaction.reply({ 
-          content: 'Thoda ruk jao… yaadon ka record load ho raha hai 🎵',
+          content: 'Thoda ruk jao… connection establish ho raha hai 🎵',
           ephemeral: true 
         });
       }
