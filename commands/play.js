@@ -58,13 +58,7 @@ export default {
           leaveOnEmpty: true,
           leaveOnEmptyCooldown: 60000,
           leaveOnEnd: false,
-          selfDeaf: true,
-          // Disable all DSP filters to simplify the audio pipeline on Node 24
-          disableBiquad: true,
-          disableEqualizer: true,
-          disableVolume: true,
-          disableResampler: true,
-          disableFilterer: true
+          selfDeaf: true
         }
       });
 
