@@ -77,12 +77,17 @@ export default {
       }, 1500);
 
 
-      // Search for the track using Kazagumo
-      let res = await interaction.client.manager.search(searchQuery, { requester: interaction.user });
+      // 1. Try YouTube Music first (Guarantees Official Songs and bypasses many IP blocks)
+      let res = await interaction.client.manager.search(`ytmsearch:${searchQuery}`, { requester: interaction.user });
 
-      // If soundcloud fails to find the track, aggressively fallback to YouTube Music search
+      // 2. Fallback to standard YouTube if YouTube Music returns nothing
       if (!res || !res.tracks || !res.tracks.length) {
-        res = await interaction.client.manager.search(`ytmsearch:${searchQuery}`, { requester: interaction.user });
+        res = await interaction.client.manager.search(`ytsearch:${searchQuery}`, { requester: interaction.user });
+      }
+
+      // 3. Fallback to SoundCloud as a last resort
+      if (!res || !res.tracks || !res.tracks.length) {
+        res = await interaction.client.manager.search(`scsearch:${searchQuery}`, { requester: interaction.user });
       }
 
       if (!res || !res.tracks || !res.tracks.length) {
