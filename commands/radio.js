@@ -24,9 +24,25 @@ export default {
       let firstSongDetails = null;
       let addedCount = 0;
 
+      // Helper function to prepare track
+      const getTrack = async (songDetails) => {
+        const ytSearch = await player.search(`${songDetails.title} ${songDetails.artist}`, {
+          requestedBy: interaction.user,
+          searchEngine: QueryType.YOUTUBE
+        });
+        if (!ytSearch || ytSearch.tracks.length === 0) return null;
+        let track = ytSearch.tracks[0];
+        const ytDlpExt = player.extractors.get('YtDlpExtractor');
+        if (ytDlpExt) track.extractor = ytDlpExt;
+        return track;
+      };
+
       // Play the first song immediately
       firstSongDetails = shuffled[0];
-      const firstResult = await player.play(member.voice.channel, `${firstSongDetails.title} ${firstSongDetails.artist}`, {
+      const firstTrackObj = await getTrack(firstSongDetails);
+      if (!firstTrackObj) return interaction.editReply('❌ Pehla gaana nahi mila!');
+
+      const firstResult = await player.play(member.voice.channel, firstTrackObj, {
         nodeOptions: {
           metadata: interaction,
           volume: 80,
@@ -36,7 +52,6 @@ export default {
           selfDeaf: true
         }
       });
-      
       firstTrack = firstResult.track;
       addedCount++;
 
@@ -44,10 +59,13 @@ export default {
       for (let i = 1; i < shuffled.length; i++) {
         const song = shuffled[i];
         try {
-          await player.play(member.voice.channel, `${song.title} ${song.artist}`, {
-            nodeOptions: { metadata: interaction } // don't need full options for subsequent tracks
-          });
-          addedCount++;
+          const t = await getTrack(song);
+          if (t) {
+            await player.play(member.voice.channel, t, {
+              nodeOptions: { metadata: interaction } // don't need full options for subsequent tracks
+            });
+            addedCount++;
+          }
         } catch (e) {
           console.error(`Failed to queue ${song.title}`);
         }
@@ -66,15 +84,17 @@ export default {
       const buttons = new ActionRowBuilder()
         .addComponents(
           new ButtonBuilder().setCustomId('pause').setLabel('Pause').setEmoji('⏸️').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId('resume').setLabel('Resume').setEmoji('▶️').setStyle(ButtonStyle.Success),
           new ButtonBuilder().setCustomId('skip').setLabel('Skip').setEmoji('⏭️').setStyle(ButtonStyle.Primary),
           new ButtonBuilder().setCustomId('stop').setLabel('Stop Radio').setEmoji('⏹️').setStyle(ButtonStyle.Danger)
         );
 
-      return interaction.editReply({ embeds: [embed], components: [buttons] });
-    } catch (error) {
-      console.error('Error in radio command:', error);
-      return interaction.editReply('❌ Radio start nahi ho paya. Dobara try karo.');
+      await interaction.editReply({ embeds: [embed], components: [buttons] });
+    } catch (e) {
+      console.error(e);
+      // If we haven't replied yet, let user know
+      if (!interaction.replied && !interaction.deferred) {
+        return interaction.reply({ content: '❌ Kuch gadbad ho gayi!', flags: 64 });
+      }
     }
-  }
+  },
 };

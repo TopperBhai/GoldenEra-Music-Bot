@@ -47,7 +47,13 @@ export default {
 
       let trackToPlay = ytSearch.tracks[0];
 
-      // Play the track directly using native YouTube extractor (powered by youtube-ext)
+      // Bypass YouTube stream IP blocks by assigning our custom yt-dlp extractor to stream this track
+      const ytDlpExt = player.extractors.get('YtDlpExtractor');
+      if (ytDlpExt) {
+        trackToPlay.extractor = ytDlpExt;
+      }
+
+      // Play the track directly
       const result = await player.play(member.voice.channel, trackToPlay, {
         nodeOptions: {
           metadata: interaction,

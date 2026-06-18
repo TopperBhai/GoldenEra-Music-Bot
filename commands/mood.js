@@ -35,7 +35,21 @@ export default {
       const searchQuery = `${song.title} ${song.artist}`;
 
       const player = useMainPlayer();
-      const result = await player.play(member.voice.channel, searchQuery, {
+      
+      const ytSearch = await player.search(searchQuery, {
+        requestedBy: interaction.user,
+        searchEngine: QueryType.YOUTUBE
+      });
+
+      if (!ytSearch || ytSearch.tracks.length === 0) {
+        return interaction.editReply('❌ Gaana nahi mila!');
+      }
+
+      let trackToPlay = ytSearch.tracks[0];
+      const ytDlpExt = player.extractors.get('YtDlpExtractor');
+      if (ytDlpExt) trackToPlay.extractor = ytDlpExt;
+
+      const result = await player.play(member.voice.channel, trackToPlay, {
         nodeOptions: {
           metadata: interaction,
           volume: 80,

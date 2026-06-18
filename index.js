@@ -55,9 +55,12 @@ const player = new Player(client, {
   }
 });
 
+import { YtDlpExtractor } from './extractors/ytdlp.js';
+
 // Register extractors
 await player.extractors.loadDefault();
 await player.extractors.register(YoutubeiExtractor, {});
+await player.extractors.register(YtDlpExtractor, {});
 console.log('✅ Extractors registered successfully!');
 
 // --- Player Events ---
