@@ -1,5 +1,6 @@
 import { BaseExtractor, Track } from 'discord-player';
 import CryptoJS from 'crypto-js';
+import { Readable } from 'stream';
 
 export class JioSaavnExtractor extends BaseExtractor {
   static identifier = 'JioSaavnExtractor';
@@ -84,7 +85,11 @@ export class JioSaavnExtractor extends BaseExtractor {
     // 3. Force 320kbps premium quality 
     streamUrl = streamUrl.replace('_96.mp4', '_320.mp4').replace('_160.mp4', '_320.mp4');
 
-    // 4. Return the raw string URL so discord-player can play it natively
-    return streamUrl;
+    // 4. Return a raw Readable web stream so discord-player doesn't try to bridge the string URL
+    const streamRes = await fetch(streamUrl);
+    if (!streamRes.ok || !streamRes.body) throw new Error('Failed to fetch audio stream bytes from JioSaavn CDN.');
+    
+    // Convert Web ReadableStream to Node.js Readable stream for FFMPEG compatibility
+    return Readable.fromWeb(streamRes.body);
   }
 }
