@@ -48,7 +48,20 @@ export default {
       let trackToPlay = ytSearch.tracks[0];
 
       // 2. Bridge to SoundCloud to bypass YouTube's IP blocks on Render
-      let scSearch = await player.search(`${trackToPlay.title} ${trackToPlay.author}`, {
+      let scQuery = searchQuery;
+      // If the user pasted a YouTube URL, searching SC with a URL will fail. 
+      // We MUST search SC with the track title, but we need to clean it first.
+      if (searchQuery.includes('youtube.com') || searchQuery.includes('youtu.be')) {
+        scQuery = trackToPlay.title
+          .replace(/\[.*?\]|\(.*?\)|\|.*/g, '') // remove brackets and anything after |
+          .replace(/video song|lyrical|official video/gi, '') // remove common garbage
+          .trim();
+        // Fallback to original title if cleaning made it empty
+        if (!scQuery) scQuery = trackToPlay.title;
+      }
+
+      // Search SC using the clean query, because searching SC with a messy YT title often returns 0 results
+      let scSearch = await player.search(scQuery, {
         requestedBy: interaction.user,
         searchEngine: QueryType.SOUNDCLOUD
       });
@@ -56,10 +69,12 @@ export default {
       if (scSearch && scSearch.tracks.length > 0) {
         // We found it on SC! Use the SC audio track but keep YT metadata
         let scTrack = scSearch.tracks[0];
-        scTrack.title = trackToPlay.title;
-        scTrack.author = trackToPlay.author;
-        scTrack.thumbnail = trackToPlay.thumbnail;
+        scTrack.title = trackToPlay.title; // Keep YT Title
+        scTrack.author = trackToPlay.author; // Keep YT Author
+        scTrack.thumbnail = trackToPlay.thumbnail; // Keep YT Thumbnail
         trackToPlay = scTrack;
+      } else {
+        return interaction.editReply('❌ SoundCloud pe streaming link nahi mili. Dusra gaana try karo.');
       }
 
       // Play the bridged track
