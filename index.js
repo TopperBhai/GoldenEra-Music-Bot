@@ -1,3 +1,5 @@
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
 import 'dotenv/config';
 import { Client, Collection, GatewayIntentBits, REST, Routes } from 'discord.js';
 import { readdirSync, readFileSync } from 'fs';
