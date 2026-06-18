@@ -1,8 +1,9 @@
 import { BaseExtractor, Track } from 'discord-player';
 import CryptoJS from 'crypto-js';
-import { spawn } from 'child_process';
-import ffmpegPath from 'ffmpeg-static';
-
+import axios from 'axios';
+import { writeFileSync, unlinkSync, existsSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 export class JioSaavnExtractor extends BaseExtractor {
   static identifier = 'JioSaavnExtractor';
@@ -12,7 +13,7 @@ export class JioSaavnExtractor extends BaseExtractor {
   }
 
   async validate(query, type) {
-    // Handle text searches natively, and also accept JioSaavn track URLs during stream resolution
+    // Accept text searches, JioSaavn URLs, and arbitrary source tracks (for stream resolution)
     if (type === 'arbitrary') return true;
     return type === 'AUTO' || !query.startsWith('http') || query.includes('jiosaavn.com') || query.includes('saavn.com');
   }
@@ -50,14 +51,14 @@ export class JioSaavnExtractor extends BaseExtractor {
         author: author,
         url: trackInfo.url,
         thumbnail: image,
-        duration: '0:00', // Duration fetched on stream resolution if needed
+        duration: '0:00',
         views: 0,
         requestedBy: context.requestedBy,
-        source: 'arbitrary', // using 'arbitrary' stops other Extractors from attempting to bridge it
-        raw: trackInfo // Store the JioSaavn payload so we can grab the ID during streaming
+        source: 'arbitrary',
+        raw: trackInfo
       });
 
-      // 5. CRITICAL FIX: Explicitly tell discord-player that this extractor handles this track's stream!
+      // 5. Explicitly bind this extractor so discord-player routes stream() back to us
       track.extractor = this;
 
       return this.createResponse(null, [track]);
@@ -92,25 +93,38 @@ export class JioSaavnExtractor extends BaseExtractor {
       // 3. Force 320kbps premium quality 
       streamUrl = streamUrl.replace('_96.mp4', '_320.mp4').replace('_160.mp4', '_320.mp4');
 
-      // 4. Spawn a native FFmpeg process to download the MP4 using Android spoofing headers.
-      // FFmpeg HTTP demuxer natively supports Range requests, meaning it can instantly seek the MP4 MOOV atom at the end of the file.
-      // We then transmux the decoded audio to MP3 and pipe it to discord-player, which solves all streaming issues.
-      const ffmpegArgs = [
-        '-headers', 'User-Agent: Dalvik/2.1.0 (Linux; U; Android 11; SM-G991B)\r\n',
-        '-i', streamUrl,
-        '-f', 'mp3',
-        '-ac', '2',
-        '-ar', '48000',
-        'pipe:1'
-      ];
+      // 4. Download the COMPLETE MP4 file to a local temp file using Android app spoofing.
+      //    WHY: discord-player's internal FFmpeg uses default headers (blocked by Akamai on datacenters).
+      //    Piping through Node.js streams fails because FFmpeg can't seek the MP4 MOOV atom.
+      //    By downloading first and giving FFmpeg a local file path, it can seek freely and parse perfectly.
+      console.log(`📥 Downloading JioSaavn track ${trackId} to temp file...`);
       
-      const ffmpeg = spawn(ffmpegPath, ffmpegArgs);
+      const response = await axios.get(streamUrl, {
+        responseType: 'arraybuffer',
+        headers: { 'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 11; SM-G991B Build/RP1A.200720.012)' },
+        timeout: 30000 // 30 second timeout
+      });
+
+      const tmpPath = join(tmpdir(), `jiosaavn_${trackId}_${Date.now()}.mp4`);
+      writeFileSync(tmpPath, Buffer.from(response.data));
       
-      // discord-player will automatically consume and destroy this readable stream when the song ends or skips,
-      // which safely closes the ffmpeg process.
-      return ffmpeg.stdout;
+      console.log(`✅ Downloaded ${(response.data.byteLength / 1024 / 1024).toFixed(2)}MB to ${tmpPath}`);
+
+      // 5. Schedule cleanup after 10 minutes (song will be done by then)
+      setTimeout(() => {
+        try { 
+          if (existsSync(tmpPath)) {
+            unlinkSync(tmpPath);
+            console.log(`🧹 Cleaned up temp file: ${tmpPath}`);
+          }
+        } catch(e) {}
+      }, 600000);
+
+      // 6. Return the LOCAL file path. discord-player's FFmpeg can seek local files perfectly,
+      //    resolving both the Akamai block AND the MP4 MOOV atom seeking issue.
+      return tmpPath;
     } catch (error) {
-      console.error('🔥 CRITICAL ERROR IN JIOSAAVN STREAM:', error);
+      console.error('🔥 CRITICAL ERROR IN JIOSAAVN STREAM:', error.message);
       try {
         const queue = this.context.player.nodes.get(info.guildId);
         if (queue && queue.metadata && queue.metadata.channel) {
