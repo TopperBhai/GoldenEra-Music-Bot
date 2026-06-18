@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { useMainPlayer, QueryType } from 'discord-player';
 import { playlists, getRandomSong } from '../data/playlists.js';
+import { preloadJioSaavnTrack } from '../extractors/JioSaavnExtractor.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -50,7 +51,21 @@ export default {
 
       let trackToPlay = ytSearch.tracks[0];
 
-      // Play the track directly using our custom mp4 stream decrypter
+      // PRE-DOWNLOAD: Download the MP4 BEFORE joining voice.
+      // WHY: discord-player joins voice then calls extractor.stream().
+      // The 10-second download blocks the voice WS handshake → it times out → no audio.
+      // By downloading first, stream() returns the local path INSTANTLY → voice handshake completes fine.
+      if (trackToPlay.source === 'arbitrary' && trackToPlay.raw?.id) {
+        try {
+          const localPath = await preloadJioSaavnTrack(trackToPlay.raw.id);
+          trackToPlay.raw.localPath = localPath;
+        } catch(e) {
+          console.error('Pre-download failed:', e.message);
+          return interaction.editReply('❌ JioSaavn download failed: ' + e.message);
+        }
+      }
+
+      // Play the track — stream() will return the pre-downloaded path instantly
       const result = await player.play(member.voice.channel, trackToPlay, {
         nodeOptions: {
           metadata: interaction,
