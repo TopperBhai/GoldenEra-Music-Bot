@@ -60,6 +60,24 @@ const Nodes = [
     url: 'lavalink.jirayu.net:13592',
     auth: 'youshallnotpass',
     secure: false
+  },
+  {
+    name: 'SSRR Node',
+    url: 'node.ssrr.app:80',
+    auth: 'ssrr.app',
+    secure: false
+  },
+  {
+    name: 'Kitsune Node',
+    url: 'lavalink.kitsune.si:443',
+    auth: 'youshallnotpass',
+    secure: true
+  },
+  {
+    name: 'Oops Node',
+    url: 'lavalink.oops.wtf:2000',
+    auth: 'www.freelavalink.rest',
+    secure: false
   }
 ];
 
