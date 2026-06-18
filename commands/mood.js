@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { useMainPlayer } from 'discord-player';
+import { useMainPlayer, QueryType } from 'discord-player';
 import { playlists, getRandomSong } from '../data/playlists.js';
 
 export default {
@@ -36,6 +36,7 @@ export default {
 
       const player = useMainPlayer();
       const result = await player.play(member.voice.channel, searchQuery, {
+        searchEngine: QueryType.SOUNDCLOUD,
         nodeOptions: {
           metadata: interaction,
           volume: 80,

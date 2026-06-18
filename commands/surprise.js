@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { useMainPlayer } from 'discord-player';
+import { useMainPlayer, QueryType } from 'discord-player';
 import { getAllSongs } from '../data/playlists.js';
 
 export default {
@@ -22,6 +22,7 @@ export default {
       const searchQuery = `${song.title} ${song.artist}`;
 
       const result = await player.play(member.voice.channel, searchQuery, {
+        searchEngine: QueryType.SOUNDCLOUD,
         nodeOptions: {
           metadata: interaction,
           volume: 80,

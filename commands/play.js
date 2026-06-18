@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { useMainPlayer } from 'discord-player';
+import { useMainPlayer, QueryType } from 'discord-player';
 import { playlists, getRandomSong } from '../data/playlists.js';
 
 export default {
@@ -35,8 +35,35 @@ export default {
         isCategory = true;
       }
 
-      // discord-player handles everything: YouTube links, search queries, streaming
-      const result = await player.play(member.voice.channel, searchQuery, {
+      // 1. Search YouTube first to get accurate metadata (Hindi songs need this)
+      let ytSearch = await player.search(searchQuery, {
+        requestedBy: interaction.user,
+        searchEngine: QueryType.YOUTUBE
+      });
+
+      if (!ytSearch || !ytSearch.tracks.length) {
+        return interaction.editReply('❌ Kuch nahi mila! Search term check karo.');
+      }
+
+      let trackToPlay = ytSearch.tracks[0];
+
+      // 2. Bridge to SoundCloud to bypass YouTube's IP blocks on Render
+      let scSearch = await player.search(`${trackToPlay.title} ${trackToPlay.author}`, {
+        requestedBy: interaction.user,
+        searchEngine: QueryType.SOUNDCLOUD
+      });
+
+      if (scSearch && scSearch.tracks.length > 0) {
+        // We found it on SC! Use the SC audio track but keep YT metadata
+        let scTrack = scSearch.tracks[0];
+        scTrack.title = trackToPlay.title;
+        scTrack.author = trackToPlay.author;
+        scTrack.thumbnail = trackToPlay.thumbnail;
+        trackToPlay = scTrack;
+      }
+
+      // Play the bridged track
+      const result = await player.play(member.voice.channel, trackToPlay, {
         nodeOptions: {
           metadata: interaction,
           volume: 80,
@@ -55,7 +82,7 @@ export default {
         .setColor('#FFD700')
         .setTitle('🎶 Now Playing')
         .setDescription(`**${title}**\n${author}`)
-        .setFooter({ text: isCategory && songDetails?.message ? songDetails.message : `Source: ${track.source || 'YouTube'} • ${track.duration}` })
+        .setFooter({ text: isCategory && songDetails?.message ? songDetails.message : `Source: Bridged via SoundCloud • ${track.duration}` })
         .setTimestamp();
 
       if (track.thumbnail) {
