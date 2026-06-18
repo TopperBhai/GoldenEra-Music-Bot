@@ -50,15 +50,21 @@ client.commands = new Collection();
 // --- LAVALINK SETUP ---
 const Nodes = [
   {
-    name: 'Darren Node Secure',
-    url: 'lavalink.darrennathanael.com:443',
+    name: 'Jirayu Node Secure',
+    url: 'lavalink.jirayu.net:443',
     auth: 'youshallnotpass',
     secure: true
   },
   {
-    name: 'Darren Node',
-    url: 'lavalink.darrennathanael.com:80',
-    auth: 'youshallnotpass',
+    name: 'Trinium Node',
+    url: 'lavalink-v4.triniumhost.com:443',
+    auth: 'free',
+    secure: true
+  },
+  {
+    name: 'G3V Node',
+    url: 'lava.g3v.co.uk:9008',
+    auth: 'lavalinklol',
     secure: false
   }
 ];
