@@ -11,7 +11,7 @@ export default {
     if (!member.voice.channel) {
       return interaction.reply({
         content: '❌ Pehle voice channel mein aao… phir gaana sunenge 🎵',
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -26,14 +26,22 @@ export default {
         guildId: interaction.guildId,
         textId: interaction.channelId,
         voiceId: member.voice.channel.id,
-        volume: 50,
-        deaf: true
+        volume: 100,
+        deaf: true,
+        mute: false
       });
 
-      const res = await interaction.client.manager.search(searchQuery, { requester: interaction.user });
+      // Try YouTube Music first, then YouTube, then SoundCloud
+      let res = await interaction.client.manager.search(`ytmsearch:${searchQuery}`, { requester: interaction.user });
+      if (!res?.tracks?.length) {
+        res = await interaction.client.manager.search(`ytsearch:${searchQuery}`, { requester: interaction.user });
+      }
+      if (!res?.tracks?.length) {
+        res = await interaction.client.manager.search(`scsearch:${searchQuery}`, { requester: interaction.user });
+      }
 
-      if (!res.tracks.length) {
-        return interaction.editReply('❌ Kuch nahi mila! Cannot find the surprise song.');
+      if (!res?.tracks?.length) {
+        return interaction.editReply('❌ Surprise song nahi mila! Dobara try karo.');
       }
 
       const track = res.tracks[0];
@@ -56,38 +64,18 @@ export default {
 
       const buttons = new ActionRowBuilder()
         .addComponents(
-          new ButtonBuilder()
-            .setCustomId('pause')
-            .setLabel('Pause')
-            .setEmoji('⏸️')
-            .setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder()
-            .setCustomId('resume')
-            .setLabel('Resume')
-            .setEmoji('▶️')
-            .setStyle(ButtonStyle.Success),
-          new ButtonBuilder()
-            .setCustomId('skip')
-            .setLabel('Skip')
-            .setEmoji('⏭️')
-            .setStyle(ButtonStyle.Primary),
-          new ButtonBuilder()
-            .setCustomId('loop')
-            .setLabel('Loop')
-            .setEmoji('🔁')
-            .setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder()
-            .setCustomId('stop')
-            .setLabel('Stop')
-            .setEmoji('⏹️')
-            .setStyle(ButtonStyle.Danger)
+          new ButtonBuilder().setCustomId('pause').setLabel('Pause').setEmoji('⏸️').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId('resume').setLabel('Resume').setEmoji('▶️').setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId('skip').setLabel('Skip').setEmoji('⏭️').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId('loop').setLabel('Loop').setEmoji('🔁').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId('stop').setLabel('Stop').setEmoji('⏹️').setStyle(ButtonStyle.Danger)
         );
 
       return interaction.editReply({ embeds: [embed], components: [buttons] });
 
     } catch (error) {
       console.error('Error in surprise command:', error);
-      return interaction.editReply('Thoda ruk jao… connection establish ho raha hai 🎵');
+      return interaction.editReply('❌ Surprise mein dikkat aayi. Dobara try karo.');
     }
   }
 };

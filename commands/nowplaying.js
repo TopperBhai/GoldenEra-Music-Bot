@@ -11,7 +11,7 @@ export default {
     if (!player || !player.queue.current) {
       return interaction.reply({
         content: '❌ Abhi koi gaana nahi chal raha hai.',
-        ephemeral: true
+        flags: 64
       });
     }
 

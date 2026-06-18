@@ -11,7 +11,7 @@ export default {
     if (!member.voice.channel) {
       return interaction.reply({
         content: '❌ Pehle voice channel mein aao… phir gaana sunenge 🎵',
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -22,79 +22,74 @@ export default {
         guildId: interaction.guildId,
         textId: interaction.channelId,
         voiceId: member.voice.channel.id,
-        volume: 50,
-        deaf: true
+        volume: 100,
+        deaf: true,
+        mute: false
       });
 
       const allSongs = getAllSongs();
       let firstTrack = null;
       let firstSongDetails = null;
+      let addedCount = 0;
 
-      // Queue 10 random songs
-      for (let i = 0; i < 10; i++) {
-        const randomSong = allSongs[Math.floor(Math.random() * allSongs.length)];
-        const searchQuery = `${randomSong.title} ${randomSong.artist}`;
-        const res = await interaction.client.manager.search(searchQuery, { requester: interaction.user });
-        
-        if (res.tracks.length) {
+      // Pick 10 unique random songs
+      const shuffled = [...allSongs].sort(() => Math.random() - 0.5).slice(0, 10);
+
+      // Search all 10 songs in parallel for speed
+      const searchPromises = shuffled.map(song => {
+        const q = `${song.title} ${song.artist}`;
+        return interaction.client.manager.search(`ytmsearch:${q}`, { requester: interaction.user })
+          .then(res => ({ res, song }))
+          .catch(() => ({ res: null, song }));
+      });
+
+      const results = await Promise.all(searchPromises);
+
+      for (const { res, song } of results) {
+        if (res?.tracks?.length) {
           const track = res.tracks[0];
           player.queue.add(track);
-          if (i === 0) {
+          addedCount++;
+          if (!firstTrack) {
             firstTrack = track;
-            firstSongDetails = randomSong;
+            firstSongDetails = song;
           }
         }
+      }
+
+      if (!firstTrack || addedCount === 0) {
+        return interaction.editReply('❌ Radio start nahi ho paya, search failed.');
       }
 
       if (!player.playing && !player.paused) {
         player.play();
       }
 
-      if (firstTrack) {
-        const embed = new EmbedBuilder()
-          .setColor('#E91E63')
-          .setTitle('📻 GoldenEra Radio - ON AIR')
-          .setDescription(`**${firstSongDetails.title}**\n${firstSongDetails.artist} • ${firstSongDetails.year}`)
-          .addFields({ name: '🎵 Mode', value: 'Queued 10 random classics!' })
-          .setFooter({ text: 'Use /stop to turn off radio' })
-          .setTimestamp();
+      const embed = new EmbedBuilder()
+        .setColor('#E91E63')
+        .setTitle('📻 GoldenEra Radio - ON AIR')
+        .setDescription(`**${firstSongDetails.title}**\n${firstSongDetails.artist} • ${firstSongDetails.year}`)
+        .addFields({ name: '🎵 Mode', value: `Queued ${addedCount} classics!` })
+        .setFooter({ text: 'Use /stop to turn off radio' })
+        .setTimestamp();
 
-        if (firstTrack.thumbnail) {
-          embed.setThumbnail(firstTrack.thumbnail);
-        }
-
-        const buttons = new ActionRowBuilder()
-          .addComponents(
-            new ButtonBuilder()
-              .setCustomId('pause')
-              .setLabel('Pause')
-              .setEmoji('⏸️')
-              .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-              .setCustomId('resume')
-              .setLabel('Resume')
-              .setEmoji('▶️')
-              .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-              .setCustomId('skip')
-              .setLabel('Skip')
-              .setEmoji('⏭️')
-              .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-              .setCustomId('stop')
-              .setLabel('Stop Radio')
-              .setEmoji('⏹️')
-              .setStyle(ButtonStyle.Danger)
-          );
-
-        return interaction.editReply({ embeds: [embed], components: [buttons] });
-      } else {
-        return interaction.editReply('❌ Radio start nahi ho paya, search failed.');
+      if (firstTrack.thumbnail) {
+        embed.setThumbnail(firstTrack.thumbnail);
       }
+
+      const buttons = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder().setCustomId('pause').setLabel('Pause').setEmoji('⏸️').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId('resume').setLabel('Resume').setEmoji('▶️').setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId('skip').setLabel('Skip').setEmoji('⏭️').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId('stop').setLabel('Stop Radio').setEmoji('⏹️').setStyle(ButtonStyle.Danger)
+        );
+
+      return interaction.editReply({ embeds: [embed], components: [buttons] });
 
     } catch (error) {
       console.error('Error in radio command:', error);
-      return interaction.editReply('Thoda ruk jao… connection establish ho raha hai 🎵');
+      return interaction.editReply('❌ Radio mein dikkat aayi. Dobara try karo.');
     }
   }
 };

@@ -8,7 +8,7 @@ export default {
   async execute(interaction) {
     const player = interaction.client.manager.players.get(interaction.guildId);
     if (!player) {
-      return interaction.reply({ content: '❌ Yahan koi gaana nahi chal raha.', ephemeral: true });
+      return interaction.reply({ content: '❌ Yahan koi gaana nahi chal raha.', flags: 64 });
     }
     
     player.skip();

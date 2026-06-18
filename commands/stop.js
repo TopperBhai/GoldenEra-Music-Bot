@@ -8,11 +8,16 @@ export default {
   async execute(interaction) {
     const player = interaction.client.manager.players.get(interaction.guildId);
     if (!player) {
-      return interaction.reply({ content: '❌ Yahan koi gaana nahi chal raha.', ephemeral: true });
+      return interaction.reply({ content: '❌ Yahan koi gaana nahi chal raha.', flags: 64 });
     }
     
-    player.queue.clear();
-    player.skip();
+    try {
+      player.queue.clear();
+      player.destroy();
+    } catch(e) {
+      console.error('Destroy failed:', e.message);
+      try { player.skip(); } catch(e2) {}
+    }
     return interaction.reply('⏹️ Music band ho gayi aur queue clear ho gaya.');
   }
 };

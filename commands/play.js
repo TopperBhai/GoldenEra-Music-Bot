@@ -1,6 +1,23 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { playlists, getRandomSong } from '../data/playlists.js';
 
+// Helper: robust multi-engine search with YouTube Music priority
+async function robustSearch(manager, query, requester) {
+  const engines = ['ytmsearch', 'ytsearch', 'scsearch'];
+  
+  for (const engine of engines) {
+    try {
+      const res = await manager.search(`${engine}:${query}`, { requester });
+      if (res && res.tracks && res.tracks.length > 0) {
+        return res;
+      }
+    } catch (e) {
+      console.error(`Search failed on ${engine}:`, e.message);
+    }
+  }
+  return null;
+}
+
 export default {
   data: new SlashCommandBuilder()
     .setName('play')
@@ -17,7 +34,7 @@ export default {
       if (!member.voice.channel) {
         return interaction.reply({ 
           content: '❌ Pehle voice channel mein aao… phir gaana sunenge 🎵',
-          ephemeral: true 
+          flags: 64 
         });
       }
 
@@ -34,18 +51,18 @@ export default {
           const oembedRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(query)}&format=json`);
           if (oembedRes.ok) {
             const data = await oembedRes.json();
-            // Clean up the title aggressively for SoundCloud
+            // Clean up the title: remove bracketed text and everything after |
             let cleanTitle = data.title;
-            // Remove everything after | or - as they usually contain movie names, actors, or "official video"
-            cleanTitle = cleanTitle.split('|')[0].split('-')[0];
-            // Remove bracketed text like (Official Video) or [Lyrical]
+            cleanTitle = cleanTitle.split('|')[0];
             cleanTitle = cleanTitle.replace(/(\(|\[).*?(\)|\])/g, '');
+            cleanTitle = cleanTitle.replace(/official|video|lyric|full|hd|hq|audio|song/gi, '');
             searchQuery = cleanTitle.trim();
           } else {
-            return interaction.editReply('❌ YouTube link invalid or blocked. Please type the song name instead!');
+            return interaction.editReply('❌ YouTube link invalid ya blocked hai. Gaane ka naam likh ke try karo!');
           }
         } catch (e) {
-          console.error("oEmbed fetch failed", e);
+          console.error("oEmbed fetch failed:", e.message);
+          // If oEmbed fails, just use the raw query as search text
         }
       } else if (playlists[query.toLowerCase()]) {
         const playlist = playlists[query.toLowerCase()];
@@ -64,34 +81,11 @@ export default {
         mute: false
       });
 
-      // Force discord.js to explicitly unmute the bot in case it got stuck in a muted state
-      setTimeout(async () => {
-        try {
-          const me = interaction.guild.members.me;
-          if (me && me.voice && me.voice.channelId) {
-            // This forces self-mute to false and self-deaf to true natively
-            await me.edit({ mute: false, deaf: true }).catch(() => {});
-            await me.voice.setMute(false, 'Ensuring bot can play audio').catch(() => {});
-          }
-        } catch (e) {}
-      }, 1500);
-
-
-      // 1. Try YouTube Music first (Guarantees Official Songs and bypasses many IP blocks)
-      let res = await interaction.client.manager.search(`ytmsearch:${searchQuery}`, { requester: interaction.user });
-
-      // 2. Fallback to standard YouTube if YouTube Music returns nothing
-      if (!res || !res.tracks || !res.tracks.length) {
-        res = await interaction.client.manager.search(`ytsearch:${searchQuery}`, { requester: interaction.user });
-      }
-
-      // 3. Fallback to SoundCloud as a last resort
-      if (!res || !res.tracks || !res.tracks.length) {
-        res = await interaction.client.manager.search(`scsearch:${searchQuery}`, { requester: interaction.user });
-      }
+      // Robust multi-engine search
+      const res = await robustSearch(interaction.client.manager, searchQuery, interaction.user);
 
       if (!res || !res.tracks || !res.tracks.length) {
-        return interaction.editReply('❌ Kuch nahi mila! Please try a different link or search term.');
+        return interaction.editReply('❌ Kuch nahi mila! Please try a different search term.');
       }
 
       const track = res.tracks[0];
@@ -152,11 +146,11 @@ export default {
     } catch (error) {
       console.error('Error in play command:', error);
       if (interaction.deferred) {
-        return interaction.editReply('Thoda ruk jao… connection establish ho raha hai 🎵');
+        return interaction.editReply('❌ Gaana search karne mein dikkat aayi. Dobara try karo.');
       } else {
         return interaction.reply({ 
-          content: 'Thoda ruk jao… connection establish ho raha hai 🎵',
-          ephemeral: true 
+          content: '❌ Gaana search karne mein dikkat aayi. Dobara try karo.',
+          flags: 64 
         });
       }
     }

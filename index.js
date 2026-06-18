@@ -16,7 +16,8 @@ const __dirname = dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('GoldenEra Music Bot is alive!'));
-app.listen(port, () => console.log(`🌍 Dummy web server listening on port ${port} (for Render)`));
+app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+app.listen(port, () => console.log(`🌍 Web server listening on port ${port}`));
 // ----------------------------------
 
 // Load config (with fallback to process.env for Render deployment)
@@ -71,30 +72,56 @@ client.manager = new Kazagumo({
   }
 }, new Connectors.DiscordJS(client), Nodes);
 
+// --- Lavalink Node Events ---
 client.manager.shoukaku.on('ready', (name) => console.log(`🎵 Lavalink Node: ${name} is ready!`));
-client.manager.shoukaku.on('error', (name, error) => console.error(`❌ Lavalink Node: ${name} threw an error:`, error));
-client.manager.shoukaku.on('close', (name, code, reason) => console.warn(`⚠️ Lavalink Node: ${name} closed with code ${code}. Reason: ${reason}`));
+client.manager.shoukaku.on('error', (name, error) => console.error(`❌ Lavalink Node: ${name} error:`, error.message || error));
+client.manager.shoukaku.on('close', (name, code, reason) => console.warn(`⚠️ Lavalink Node: ${name} closed (code ${code})`));
 client.manager.shoukaku.on('disconnect', (name, players, moved) => console.warn(`⚠️ Lavalink Node: ${name} disconnected. Moved: ${moved}`));
 
-client.manager.on('playerStart', (player, track) => console.log(`▶️ Started playing: ${track.title} in ${player.guildId}`));
-client.manager.on('playerEnd', (player, track) => console.log(`⏹️ Finished playing: ${track.title}`));
+// --- Kazagumo Player Events ---
+client.manager.on('playerStart', (player, track) => {
+  console.log(`▶️ Started playing: ${track.title} in ${player.guildId}`);
+});
+
+client.manager.on('playerEnd', (player, track) => {
+  console.log(`⏹️ Finished: ${track.title}`);
+});
+
 client.manager.on('playerEmpty', player => {
-  console.log(`🈳 Queue empty for ${player.guildId}.`);
-  // Do NOT destroy the player here. Let it stay in the voice channel to prevent reconnection bugs.
+  console.log(`🈳 Queue empty for ${player.guildId}. Player stays in VC.`);
 });
-client.manager.on('playerClosed', (player, data) => console.warn(`⚠️ Player closed:`, data));
+
+client.manager.on('playerClosed', (player, data) => {
+  console.warn(`⚠️ Player closed:`, data.reason || data.code || 'unknown');
+});
+
 client.manager.on('playerStuck', (player, data) => {
-  console.error(`❌ Player stuck:`, data);
-  player.skip();
+  console.error(`❌ Player stuck! Auto-skipping...`);
+  try { player.skip(); } catch(e) { console.error('Skip after stuck failed:', e.message); }
 });
+
 client.manager.on('playerException', (player, data) => {
-  console.error(`❌ Player exception:`, data);
-  player.skip();
+  const msg = data?.exception?.message || 'Unknown error';
+  console.error(`❌ Player exception: ${msg}`);
+  
+  // Notify the text channel about the error
+  try {
+    const guild = client.guilds.cache.get(player.guildId);
+    if (guild && player.textId) {
+      const channel = guild.channels.cache.get(player.textId);
+      if (channel) {
+        channel.send(`⚠️ Track failed: ${msg}. Skipping to next song...`).catch(() => {});
+      }
+    }
+    player.skip();
+  } catch(e) { 
+    console.error('Skip after exception failed:', e.message); 
+  }
 });
+
 client.manager.on('playerUpdate', (player, data) => {
-  // Only log if something is actually playing and we get position updates
-  if (data && data.state && data.state.position && data.state.position > 1000 && data.state.position < 6000) {
-    console.log(`📡 Player is actively streaming data (Pos: ${data.state.position}ms)`);
+  if (data?.state?.position && data.state.position > 1000 && data.state.position < 6000) {
+    console.log(`📡 Streaming (Pos: ${data.state.position}ms)`);
   }
 });
 // ----------------------
@@ -139,6 +166,19 @@ client.once('ready', async () => {
   await registerCommands();
 });
 
+// Helper: safely reply to an interaction (handles already-replied edge cases)
+async function safeReply(interaction, content) {
+  try {
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp({ content, ephemeral: true });
+    } else {
+      await interaction.reply({ content, ephemeral: true });
+    }
+  } catch (e) {
+    console.error('SafeReply failed:', e.message);
+  }
+}
+
 // Handle slash commands
 client.on('interactionCreate', async interaction => {
   if (interaction.isChatInputCommand()) {
@@ -149,15 +189,7 @@ client.on('interactionCreate', async interaction => {
       await command.execute(interaction);
     } catch (error) {
       console.error('Error executing command:', error);
-      const reply = {
-        content: 'Thoda ruk jao… connection establish ho raha hai 🎵',
-        ephemeral: true
-      };
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(reply);
-      } else {
-        await interaction.reply(reply);
-      }
+      await safeReply(interaction, 'Thoda ruk jao… connection establish ho raha hai 🎵');
     }
   }
 
@@ -166,7 +198,7 @@ client.on('interactionCreate', async interaction => {
     const player = client.manager.players.get(interaction.guildId);
 
     if (!player) {
-      return interaction.reply({ content: '❌ Yahan koi gaana nahi chal raha.', ephemeral: true });
+      return safeReply(interaction, '❌ Yahan koi gaana nahi chal raha.');
     }
 
     try {
@@ -174,67 +206,53 @@ client.on('interactionCreate', async interaction => {
         case 'pause':
           if (!player.paused) {
             player.pause(true);
-            await interaction.reply({ content: '⏸️ Gaana roka gaya.', ephemeral: true });
+            await interaction.reply({ content: '⏸️ Gaana roka gaya.', flags: 64 });
           } else {
-            await interaction.reply({ content: '❌ Gaana pehle se hi ruka hua hai.', ephemeral: true });
+            await interaction.reply({ content: '❌ Gaana pehle se hi ruka hua hai.', flags: 64 });
           }
           break;
 
         case 'resume':
           if (player.paused) {
             player.pause(false);
-            await interaction.reply({ content: '▶️ Gaana phir se chalu.', ephemeral: true });
+            await interaction.reply({ content: '▶️ Gaana phir se chalu.', flags: 64 });
           } else {
-            await interaction.reply({ content: '❌ Gaana pehle se hi chal raha hai.', ephemeral: true });
+            await interaction.reply({ content: '❌ Gaana pehle se hi chal raha hai.', flags: 64 });
           }
           break;
 
         case 'skip':
           player.skip();
-          await interaction.reply({ content: '⏭️ Agle gaane par…', ephemeral: true });
+          await interaction.reply({ content: '⏭️ Agle gaane par…', flags: 64 });
           break;
 
         case 'loop':
           if (player.loop === 'none') {
             player.setLoop('track');
-            await interaction.reply({ content: '🔁 Loop mode ON (Single Track)', ephemeral: true });
+            await interaction.reply({ content: '🔁 Loop mode ON (Single Track)', flags: 64 });
           } else {
             player.setLoop('none');
-            await interaction.reply({ content: '🔁 Loop mode OFF', ephemeral: true });
+            await interaction.reply({ content: '🔁 Loop mode OFF', flags: 64 });
           }
           break;
 
         case 'stop':
-          player.queue.clear();
-          player.skip();
-          await interaction.reply({ content: '⏹️ Music band ho gayi.', ephemeral: true });
-          break;
-
-        case 'switch_node':
-          const current = player.shoukaku.node.name;
-          const ideal = client.manager.shoukaku.getIdealNode();
-          if (ideal && ideal.name !== current) {
-            player.shoukaku.moveNode(ideal.name);
-            await interaction.reply({ content: `🔄 Switched audio stream to ${ideal.name}!`, ephemeral: true });
-          } else {
-            // Force move to another node even if it's not "ideal"
-            const otherNodes = client.manager.shoukaku.nodes.filter(n => n.name !== current && n.state === 2);
-            if (otherNodes.size > 0) {
-              const fallback = otherNodes.first();
-              player.shoukaku.moveNode(fallback.name);
-              await interaction.reply({ content: `🔄 Switched audio stream to ${fallback.name}!`, ephemeral: true });
-            } else {
-              await interaction.reply({ content: `❌ No other backup servers available right now.`, ephemeral: true });
-            }
+          try {
+            player.queue.clear();
+            player.destroy();
+          } catch(e) {
+            console.error('Destroy failed, trying skip:', e.message);
+            try { player.skip(); } catch(e2) {}
           }
+          await interaction.reply({ content: '⏹️ Music band ho gayi.', flags: 64 });
           break;
 
         default:
-          await interaction.reply({ content: '❌ Unknown button.', ephemeral: true });
+          await interaction.reply({ content: '❌ Unknown button.', flags: 64 });
       }
     } catch (error) {
       console.error('Error handling button:', error);
-      await interaction.reply({ content: '❌ Kuch galat ho gaya.', ephemeral: true });
+      await safeReply(interaction, '❌ Kuch galat ho gaya. Dobara try karo.');
     }
   }
 });
@@ -251,7 +269,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 });
 
 client.on('error', error => console.error('Discord client error:', error));
-process.on('unhandledRejection', error => console.error('Unhandled promise rejection:', error));
+process.on('unhandledRejection', error => console.error('Unhandled rejection:', error));
 
 // Login
 client.login(botToken).catch(err => {
