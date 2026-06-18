@@ -3,6 +3,7 @@ dns.setDefaultResultOrder('ipv4first');
 import 'dotenv/config';
 import { Client, Collection, GatewayIntentBits, REST, Routes } from 'discord.js';
 import { Player, useQueue } from 'discord-player';
+import { YoutubeiExtractor } from 'discord-player-youtubei';
 import { readdirSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -56,6 +57,7 @@ const player = new Player(client, {
 
 // Register extractors
 await player.extractors.loadDefault();
+await player.extractors.register(YoutubeiExtractor, {});
 console.log('✅ Extractors registered successfully!');
 
 // --- Player Events ---
