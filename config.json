@@ -1,8 +1,0 @@
-{
-  "token": "YOUR_BOT_TOKEN_HERE",
-  "clientId": "YOUR_CLIENT_ID_HERE",
-  "defaultVolume": 0.5,
-  "eraStart": 1960,
-  "eraEnd": 2000,
-  "maxQueueSize": 100
-}

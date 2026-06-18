@@ -1,25 +1,38 @@
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
 import 'dotenv/config';
 import { Client, Collection, GatewayIntentBits, REST, Routes } from 'discord.js';
-import { readdirSync } from 'fs';
+import { readdirSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { getQueue } from './utils/musicPlayer.js';
 import sodium from 'libsodium-wrappers-sumo';
+import express from 'express';
+
+// --- RENDER FREE TIER WEBSERVER ---
+// Render requires Web Services to bind to a port within 60 seconds, otherwise it kills the app.
+const app = express();
+const port = process.env.PORT || 3000;
+app.get('/', (req, res) => res.send('GoldenEra Music Bot is alive!'));
+app.listen(port, () => console.log(`🌍 Dummy web server listening on port ${port} (for Render)`));
+// ----------------------------------
 
 // Wait for libsodium to be ready before proceeding
 await sodium.ready;
 
-const config = {
-  token: process.env.DISCORD_TOKEN,
-  clientId: process.env.DISCORD_CLIENT_ID,
-  defaultVolume: 0.5,
-  eraStart: 1960,
-  eraEnd: 2000,
-  maxQueueSize: 100
-};
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Load config (with fallback to process.env for Render deployment)
+let config = {};
+try {
+  config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf-8'));
+} catch (e) {
+  console.log('No config.json found, relying entirely on environment variables.');
+}
+
+const botToken = process.env.DISCORD_TOKEN || config.token;
+const botClientId = process.env.CLIENT_ID || process.env.DISCORD_CLIENT_ID || config.clientId;
 
 // Create Discord client
 const client = new Client({
@@ -42,7 +55,7 @@ for (const file of commandFiles) {
 }
 
 // Register slash commands
-const rest = new REST({ version: '10' }).setToken(config.token);
+const rest = new REST({ version: '10' }).setToken(botToken);
 
 async function registerCommands() {
   try {
@@ -54,8 +67,13 @@ async function registerCommands() {
       commands.push(command.default.data.toJSON());
     }
 
+    if (!botToken || !botClientId) {
+      console.error('❌ Missing bot token or client ID in config.json or environment variables.');
+      process.exit(1);
+    }
+
     await rest.put(
-      Routes.applicationCommands(config.clientId),
+      Routes.applicationCommands(botClientId),
       { body: commands }
     );
 
@@ -66,7 +84,7 @@ async function registerCommands() {
 }
 
 // Bot ready event
-client.once('clientReady', async () => {
+client.once('ready', async () => {
   console.log(`\n🎵 ════════════════════════════════════════════════ 🎵`);
   console.log(`   GoldenEra Bot is Online!`);
   console.log(`   Logged in as: ${client.user.tag}`);
@@ -178,10 +196,8 @@ process.on('unhandledRejection', error => {
 });
 
 // Login
-client.login(config.token).catch(error => {
-  console.error('❌ Failed to login:', error);
-  console.log('\n💡 Make sure you have:');
-  console.log('   1. Added your bot token in config.json');
-  console.log('   2. Added your client ID in config.json');
-  console.log('   3. Enabled necessary intents in Discord Developer Portal\n');
+client.login(botToken).catch(err => {
+  console.error('\n❌ Failed to login:', err);
+  console.log('\n💡 Make sure you have:\n   1. Added your bot token to Render Environment Variables (DISCORD_TOKEN)\n   2. Or added it in config.json locally');
+  process.exit(1);
 });

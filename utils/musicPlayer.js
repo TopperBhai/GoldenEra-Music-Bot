@@ -8,8 +8,7 @@ import {
   StreamType,
   NoSubscriberBehavior
 } from '@discordjs/voice';
-import { spawn } from 'child_process';
-import youtubeDlExec from 'youtube-dl-exec';
+import play from 'play-dl';
 import yts from 'yt-search';
 import { getRandomMessage, getAllSongs } from '../data/playlists.js';
 
@@ -54,22 +53,39 @@ export class MusicPlayer {
       selfDeaf: true
     });
 
+    const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
+      const newUdp = Reflect.get(newNetworkState, 'udp');
+      clearInterval(newUdp?.keepAliveInterval);
+    };
+
+    this.connection.on('stateChange', (oldState, newState) => {
+      const oldNetworking = Reflect.get(oldState, 'networking');
+      const newNetworking = Reflect.get(newState, 'networking');
+
+      oldNetworking?.off('stateChange', networkStateChangeHandler);
+      newNetworking?.on('stateChange', networkStateChangeHandler);
+
+      console.log(`Voice connection state changed from ${oldState.status} to ${newState.status}`);
+    });
+
     try {
-      await entersState(this.connection, VoiceConnectionStatus.Ready, 30000);
+      await entersState(this.connection, VoiceConnectionStatus.Ready, 15000);
     } catch (error) {
       console.error('Failed to join voice channel:', error);
       this.connection.destroy();
-      throw error;
+      this.connection = null;
+      throw new Error('TIMEOUT');
     }
 
-    this.connection.on(VoiceConnectionStatus.Disconnected, async () => {
+    this.connection.on(VoiceConnectionStatus.Disconnected, async (oldState, newState) => {
       try {
         await Promise.race([
           entersState(this.connection, VoiceConnectionStatus.Signalling, 5000),
           entersState(this.connection, VoiceConnectionStatus.Connecting, 5000)
         ]);
       } catch (error) {
-        this.connection.destroy();
+        if (this.connection) this.connection.destroy();
+        this.connection = null;
         queues.delete(this.guildId);
       }
     });
@@ -117,50 +133,12 @@ export class MusicPlayer {
       console.log(`✅ Found: ${video.title}`);
       console.log(`🎵 Video URL: ${video.url}`);
 
-      // Use youtube-dl-exec to get audio stream URL
-      const info = await youtubeDlExec(video.url, {
-        dumpSingleJson: true,
-        noWarnings: true,
-        noCallHome: true,
-        noCheckCertificate: true,
-        preferFreeFormats: true,
-        youtubeSkipDashManifest: true,
-        format: 'bestaudio[ext=webm]/bestaudio/best'
-      });
+      console.log(`🎧 Streaming audio using play-dl`);
 
-      // Get the audio URL from the info
-      const audioUrl = info.url || info.requested_formats?.[0]?.url;
-      
-      if (!audioUrl) {
-        console.error('❌ Could not get audio URL from video');
-        this.playNext();
-        return null;
-      }
+      const stream = await play.stream(video.url);
 
-      console.log(`🎧 Streaming audio from extracted URL`);
-
-      // Create audio resource from URL using ffmpeg via spawn
-      const ffmpegProcess = spawn('ffmpeg', [
-        '-reconnect', '1',
-        '-reconnect_streamed', '1',
-        '-reconnect_delay_max', '5',
-        '-i', audioUrl,
-        '-analyzeduration', '0',
-        '-loglevel', '0',
-        '-f', 's16le',
-        '-ar', '48000',
-        '-ac', '2',
-        'pipe:1'
-      ], {
-        stdio: ['ignore', 'pipe', 'ignore']
-      });
-
-      ffmpegProcess.on('error', (error) => {
-        console.error('FFmpeg process error:', error);
-      });
-
-      const resource = createAudioResource(ffmpegProcess.stdout, {
-        inputType: StreamType.Raw,
+      const resource = createAudioResource(stream.stream, {
+        inputType: stream.type,
         inlineVolume: true
       });
 

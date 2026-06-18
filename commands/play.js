@@ -47,7 +47,14 @@ export default {
       
       // Connect to voice channel if not connected
       if (!queue.connection) {
-        await queue.connect(member.voice.channel);
+        try {
+          await queue.connect(member.voice.channel);
+        } catch (error) {
+          if (error.message === 'TIMEOUT') {
+            return interaction.editReply('❌ **Connection Failed!**\nI cannot connect to the voice channel. Please check the channel settings and make sure I have the **Speak** permission turned ON! If I am muted, Discord blocks my connection.');
+          }
+          throw error;
+        }
       }
 
       // Add song and start playing
