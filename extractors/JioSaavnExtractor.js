@@ -1,6 +1,7 @@
 import { BaseExtractor, Track } from 'discord-player';
 import CryptoJS from 'crypto-js';
 import { Readable } from 'stream';
+import axios from 'axios';
 
 export class JioSaavnExtractor extends BaseExtractor {
   static identifier = 'JioSaavnExtractor';
@@ -89,12 +90,9 @@ export class JioSaavnExtractor extends BaseExtractor {
       // 3. Force 320kbps premium quality 
       streamUrl = streamUrl.replace('_96.mp4', '_320.mp4').replace('_160.mp4', '_320.mp4');
 
-      // 4. Return a raw Readable web stream so discord-player doesn't try to bridge the string URL
-      const streamRes = await fetch(streamUrl);
-      if (!streamRes.ok || !streamRes.body) throw new Error('Failed to fetch audio stream bytes from JioSaavn CDN.');
-      
-      // Convert Web ReadableStream to Node.js Readable stream for FFMPEG compatibility
-      return Readable.fromWeb(streamRes.body);
+      // 4. Return a backward-compatible stream using axios for Render's older Node version
+      const streamRes = await axios.get(streamUrl, { responseType: 'stream' });
+      return streamRes.data;
     } catch (error) {
       console.error('🔥 CRITICAL ERROR IN JIOSAAVN STREAM:', error);
       throw error;
