@@ -56,12 +56,18 @@ const player = new Player(client, {
   }
 });
 
-import { JioSaavnExtractor } from './extractors/JioSaavnExtractor.js';
+import { YoutubeiExtractor } from 'discord-player-youtubei';
 
-// Register our completely custom native JioSaavn engine and disable everything else that crashes
-await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor' && ext !== 'SpotifyExtractor' && ext !== 'SoundCloudExtractor');
-await player.extractors.register(JioSaavnExtractor, {});
-console.log('✅ Custom JioSaavn Engine initialized successfully!');
+// Register standard extractors but explicitly disable the default YouTube scraper
+await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
+
+// Register the advanced Android TV YouTube client to permanently bypass the 429 block
+await player.extractors.register(YoutubeiExtractor, {
+  streamOptions: {
+    useClient: 'ANDROID' // Sneaky client masking
+  }
+});
+console.log('✅ Advanced YouTubei Engine initialized successfully!');
 
 // --- Player Events ---
 player.events.on('playerStart', (queue, track) => {
