@@ -1,7 +1,6 @@
 import { BaseExtractor, Track } from 'discord-player';
 import CryptoJS from 'crypto-js';
-import { Readable, PassThrough } from 'stream';
-import axios from 'axios';
+
 
 export class JioSaavnExtractor extends BaseExtractor {
   static identifier = 'JioSaavnExtractor';
@@ -91,20 +90,9 @@ export class JioSaavnExtractor extends BaseExtractor {
       // 3. Force 320kbps premium quality 
       streamUrl = streamUrl.replace('_96.mp4', '_320.mp4').replace('_160.mp4', '_320.mp4');
 
-      // 4. Download through Node.js with Native Android App spoofing to bypass Akamai
-      const streamRes = await axios.get(streamUrl, { 
-        responseType: 'stream',
-        validateStatus: () => true, // Handle 403 manually
-        headers: { 'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 11; SM-G991B)' }
-      });
-      
-      if (streamRes.status !== 200) {
-        throw new Error(`JioSaavn CDN returned ${streamRes.status}`);
-      }
-
-      const pt = new PassThrough();
-      streamRes.data.pipe(pt);
-      return pt;
+      // 4. Return the raw string URL to let discord-player's native FFmpeg handle the download directly!
+      // This allows FFmpeg to perform HTTP range requests to find the MP4 MOOV atom, preventing silent streams.
+      return streamUrl;
     } catch (error) {
       console.error('🔥 CRITICAL ERROR IN JIOSAAVN STREAM:', error);
       try {
