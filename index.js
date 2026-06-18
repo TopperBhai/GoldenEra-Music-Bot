@@ -52,6 +52,9 @@ const player = new Player(client, {
   ytdlOptions: {
     quality: 'highestaudio',
     highWaterMark: 1 << 25
+  }
+});
+
 import fs from 'fs';
 
 let cookieStr = '';
