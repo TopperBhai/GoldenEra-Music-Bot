@@ -46,6 +46,19 @@ export default {
         mute: false
       });
 
+      // Force discord.js to explicitly unmute the bot in case it got stuck in a muted state
+      setTimeout(async () => {
+        try {
+          const me = interaction.guild.members.me;
+          if (me && me.voice && me.voice.channelId) {
+            // This forces self-mute to false and self-deaf to true natively
+            await me.edit({ mute: false, deaf: true }).catch(() => {});
+            await me.voice.setMute(false, 'Ensuring bot can play audio').catch(() => {});
+          }
+        } catch (e) {}
+      }, 1500);
+
+
       // Search for the track using Kazagumo
       const res = await interaction.client.manager.search(searchQuery, { requester: interaction.user });
 
