@@ -1,5 +1,4 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { getQueue } from '../utils/musicPlayer.js';
 import { playlists, getRandomSong } from '../data/playlists.js';
 
 export default {
@@ -19,9 +18,8 @@ export default {
         
   async execute(interaction) {
     const mood = interaction.options.getString('feeling');
-    
-    // Check if user is in a voice channel
     const member = interaction.member;
+
     if (!member.voice.channel) {
       return interaction.reply({
         content: '❌ Pehle voice channel mein aao… phir gaana sunenge 🎵',
@@ -32,94 +30,88 @@ export default {
     await interaction.deferReply();
 
     try {
-      const queue = getQueue(interaction.guildId);
-      
-      // Connect to voice channel if not connected
-      if (!queue.connection) {
-        await queue.connect(member.voice.channel);
-      }
-
-      // Get playlist based on mood
       const playlist = playlists[mood];
       if (!playlist) {
         return interaction.editReply('❌ Invalid mood selected.');
       }
 
-      // Pick a random song from the mood playlist
       const song = getRandomSong(playlist);
-      
-      // Add to queue
-      await queue.addToQueue(song);
+      const searchQuery = `${song.title} ${song.artist}`;
 
-      // If it's the first song, play it
-      if (queue.queue.length === 0 && !queue.isPlaying) {
-        const nowPlaying = await queue.playSong(song);
-        
-        if (nowPlaying) {
-          const moodMessages = {
-            sad: 'Dard bhi ek ehsaas hai… 💔',
-            romantic: 'Pyar mein dil ka kho jana… ❤️',
-            chill: 'Aaram se… sukoon se… 😌',
-            rain: 'Baarish aur purane gaane… perfect combination 🌧️'
-          };
+      const player = await interaction.client.manager.createPlayer({
+        guildId: interaction.guildId,
+        textId: interaction.channelId,
+        voiceId: member.voice.channel.id,
+        volume: 50,
+        deaf: true
+      });
 
-          const embed = new EmbedBuilder()
-            .setColor('#FFD700')
-            .setTitle('🎶 Now Playing')
-            .setDescription(`**${nowPlaying.title}**\n${nowPlaying.artist} • ${nowPlaying.year}`)
-            .addFields({ name: 'Mood', value: moodMessages[mood] })
-            .setFooter({ text: nowPlaying.message })
-            .setTimestamp();
+      const res = await interaction.client.manager.search(searchQuery, { requester: interaction.user });
 
-          if (nowPlaying.thumbnail) {
-            embed.setThumbnail(nowPlaying.thumbnail);
-          }
-
-          const buttons = new ActionRowBuilder()
-            .addComponents(
-              new ButtonBuilder()
-                .setCustomId('pause')
-                .setLabel('Pause')
-                .setEmoji('⏸️')
-                .setStyle(ButtonStyle.Secondary),
-              new ButtonBuilder()
-                .setCustomId('resume')
-                .setLabel('Resume')
-                .setEmoji('▶️')
-                .setStyle(ButtonStyle.Success),
-              new ButtonBuilder()
-                .setCustomId('skip')
-                .setLabel('Skip')
-                .setEmoji('⏭️')
-                .setStyle(ButtonStyle.Primary),
-              new ButtonBuilder()
-                .setCustomId('loop')
-                .setLabel('Loop')
-                .setEmoji('🔁')
-                .setStyle(ButtonStyle.Secondary),
-              new ButtonBuilder()
-                .setCustomId('stop')
-                .setLabel('Stop')
-                .setEmoji('⏹️')
-                .setStyle(ButtonStyle.Danger)
-            );
-
-          return interaction.editReply({ embeds: [embed], components: [buttons] });
-        }
-      } else {
-        const embed = new EmbedBuilder()
-          .setColor('#4CAF50')
-          .setTitle('✅ Added to Queue')
-          .setDescription(`**${song.title}**\n${song.artist} • ${song.year}`)
-          .setFooter({ text: `Queue position: ${queue.queue.length}` })
-          .setTimestamp();
-
-        return interaction.editReply({ embeds: [embed] });
+      if (!res.tracks.length) {
+        return interaction.editReply('❌ Kuch nahi mila! Cannot find the mood song.');
       }
+
+      const track = res.tracks[0];
+      player.queue.add(track);
+
+      if (!player.playing && !player.paused) {
+        player.play();
+      }
+
+      const moodMessages = {
+        sad: 'Dard bhi ek ehsaas hai… 💔',
+        romantic: 'Pyar mein dil ka kho jana… ❤️',
+        chill: 'Aaram se… sukoon se… 😌',
+        rain: 'Baarish aur purane gaane… perfect combination 🌧️'
+      };
+
+      const embed = new EmbedBuilder()
+        .setColor('#FFD700')
+        .setTitle('🎶 Now Playing')
+        .setDescription(`**${song.title}**\n${song.artist} • ${song.year}`)
+        .addFields({ name: 'Mood', value: moodMessages[mood] })
+        .setFooter({ text: song.message })
+        .setTimestamp();
+
+      if (track.thumbnail) {
+        embed.setThumbnail(track.thumbnail);
+      }
+
+      const buttons = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId('pause')
+            .setLabel('Pause')
+            .setEmoji('⏸️')
+            .setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder()
+            .setCustomId('resume')
+            .setLabel('Resume')
+            .setEmoji('▶️')
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId('skip')
+            .setLabel('Skip')
+            .setEmoji('⏭️')
+            .setStyle(ButtonStyle.Primary),
+          new ButtonBuilder()
+            .setCustomId('loop')
+            .setLabel('Loop')
+            .setEmoji('🔁')
+            .setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder()
+            .setCustomId('stop')
+            .setLabel('Stop')
+            .setEmoji('⏹️')
+            .setStyle(ButtonStyle.Danger)
+        );
+
+      return interaction.editReply({ embeds: [embed], components: [buttons] });
 
     } catch (error) {
       console.error('Error in mood command:', error);
-      return interaction.editReply('Thoda ruk jao… yaadon ka record load ho raha hai 🎵');
+      return interaction.editReply('Thoda ruk jao… connection establish ho raha hai 🎵');
     }
   }
 };
