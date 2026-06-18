@@ -34,8 +34,13 @@ export default {
           const oembedRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(query)}&format=json`);
           if (oembedRes.ok) {
             const data = await oembedRes.json();
-            // Clean up the title a bit for better soundcloud searching
-            searchQuery = data.title.replace(/(\(|\[).*?(official|video|lyric).*?(\)|\])/gi, '').trim();
+            // Clean up the title aggressively for SoundCloud
+            let cleanTitle = data.title;
+            // Remove everything after | or - as they usually contain movie names, actors, or "official video"
+            cleanTitle = cleanTitle.split('|')[0].split('-')[0];
+            // Remove bracketed text like (Official Video) or [Lyrical]
+            cleanTitle = cleanTitle.replace(/(\(|\[).*?(\)|\])/g, '');
+            searchQuery = cleanTitle.trim();
           } else {
             return interaction.editReply('❌ YouTube link invalid or blocked. Please type the song name instead!');
           }
@@ -73,9 +78,14 @@ export default {
 
 
       // Search for the track using Kazagumo
-      const res = await interaction.client.manager.search(searchQuery, { requester: interaction.user });
+      let res = await interaction.client.manager.search(searchQuery, { requester: interaction.user });
 
-      if (!res.tracks.length) {
+      // If soundcloud fails to find the track, aggressively fallback to YouTube Music search
+      if (!res || !res.tracks || !res.tracks.length) {
+        res = await interaction.client.manager.search(`ytmsearch:${searchQuery}`, { requester: interaction.user });
+      }
+
+      if (!res || !res.tracks || !res.tracks.length) {
         return interaction.editReply('❌ Kuch nahi mila! Please try a different link or search term.');
       }
 
