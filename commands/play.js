@@ -35,10 +35,13 @@ export default {
         isCategory = true;
       }
 
-      // 1. Search YouTube using the advanced Android TV spoof engine
+      // 1. Route search intelligently to our indestructible JioSaavn engine
+      const isUrl = /^https?:\/\//.test(searchQuery);
+      const engine = isUrl ? QueryType.AUTO : 'ext:JioSaavnExtractor';
+
       let ytSearch = await player.search(searchQuery, {
         requestedBy: interaction.user,
-        searchEngine: QueryType.YOUTUBE
+        searchEngine: engine
       });
 
       if (!ytSearch || !ytSearch.tracks.length) {
@@ -64,10 +67,10 @@ export default {
       const author = isCategory && songDetails ? songDetails.artist : track.author;
 
       const embed = new EmbedBuilder()
-        .setColor('#FF0000') // YouTube Red
+        .setColor('#2BC5B4') // JioSaavn Teal
         .setTitle('🎶 Now Playing')
         .setDescription(`**${title}**\n${author}`)
-        .setFooter({ text: isCategory && songDetails?.message ? songDetails.message : `Source: YouTube Originals • ${track.duration}` })
+        .setFooter({ text: isCategory && songDetails?.message ? songDetails.message : `Source: JioSaavn Premium • ${track.duration}` })
         .setTimestamp();
 
       if (track.thumbnail) {
