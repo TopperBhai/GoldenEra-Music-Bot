@@ -72,7 +72,7 @@ try {
 }
 
 // Register extractors
-await player.extractors.loadDefault();
+await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
 await player.extractors.register(YoutubeiExtractor, {
   cookie: cookieStr
 });
