@@ -50,15 +50,15 @@ client.commands = new Collection();
 // --- LAVALINK SETUP ---
 const Nodes = [
   {
-    name: 'VexaNode',
-    url: 'la.vexanode.cloud:2333',
+    name: 'Darren Node Secure',
+    url: 'lavalink.darrennathanael.com:443',
     auth: 'youshallnotpass',
-    secure: false
+    secure: true
   },
   {
-    name: 'Oops Node',
-    url: 'lavalink.oops.wtf:2000',
-    auth: 'www.freelavalink.rest',
+    name: 'Darren Node',
+    url: 'lavalink.darrennathanael.com:80',
+    auth: 'youshallnotpass',
     secure: false
   }
 ];
