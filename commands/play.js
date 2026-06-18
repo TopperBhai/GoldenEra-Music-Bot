@@ -35,9 +35,9 @@ export default {
         isCategory = true;
       }
 
-      // 1. Route search intelligently to avoid anonymous Spotify API rate limits
+      // 1. Route search intelligently to JioSaavn for original Bollywood tracks
       const isUrl = /^https?:\/\//.test(searchQuery);
-      const engine = isUrl ? QueryType.AUTO : QueryType.SOUNDCLOUD_SEARCH;
+      const engine = isUrl ? QueryType.AUTO : 'ext:dp.lpal.jiosaavn';
 
       let ytSearch = await player.search(searchQuery, {
         requestedBy: interaction.user,
@@ -67,10 +67,10 @@ export default {
       const author = isCategory && songDetails ? songDetails.artist : track.author;
 
       const embed = new EmbedBuilder()
-        .setColor('#1DB954') // Spotify Green
+        .setColor('#2BC5B4') // JioSaavn Teal Color
         .setTitle('🎶 Now Playing')
         .setDescription(`**${title}**\n${author}`)
-        .setFooter({ text: isCategory && songDetails?.message ? songDetails.message : `Source: Spotify High-Res • ${track.duration}` })
+        .setFooter({ text: isCategory && songDetails?.message ? songDetails.message : `Source: JioSaavn Originals • ${track.duration}` })
         .setTimestamp();
 
       if (track.thumbnail) {

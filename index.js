@@ -56,15 +56,11 @@ const player = new Player(client, {
   }
 });
 
+import { JiosaavnExtractor } from 'discord-player-jiosaavn';
+
 // Register extractors
-await player.extractors.loadDefault(
-  (ext) => ext !== 'YouTubeExtractor',
-  {
-    SpotifyExtractor: {
-      bridgeProvider: new BridgeProvider(BridgeSource.SoundCloud)
-    }
-  }
-);
+await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
+await player.extractors.register(JiosaavnExtractor, {});
 console.log('✅ Extractors registered successfully!');
 
 // --- Player Events ---
