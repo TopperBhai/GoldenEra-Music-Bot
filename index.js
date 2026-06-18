@@ -79,6 +79,24 @@ client.manager = new Kazagumo({
 
 client.manager.shoukaku.on('ready', (name) => console.log(`🎵 Lavalink Node: ${name} is ready!`));
 client.manager.shoukaku.on('error', (name, error) => console.error(`❌ Lavalink Node: ${name} threw an error:`, error));
+client.manager.shoukaku.on('close', (name, code, reason) => console.warn(`⚠️ Lavalink Node: ${name} closed with code ${code}. Reason: ${reason}`));
+client.manager.shoukaku.on('disconnect', (name, players, moved) => console.warn(`⚠️ Lavalink Node: ${name} disconnected. Moved: ${moved}`));
+
+client.manager.on('playerStart', (player, track) => console.log(`▶️ Started playing: ${track.title} in ${player.guildId}`));
+client.manager.on('playerEnd', (player, track) => console.log(`⏹️ Finished playing: ${track.title}`));
+client.manager.on('playerEmpty', player => {
+  console.log(`🈳 Queue empty for ${player.guildId}.`);
+  player.destroy();
+});
+client.manager.on('playerClosed', (player, data) => console.warn(`⚠️ Player closed:`, data));
+client.manager.on('playerStuck', (player, data) => console.error(`❌ Player stuck:`, data));
+client.manager.on('playerException', (player, data) => console.error(`❌ Player exception:`, data));
+client.manager.on('playerUpdate', (player, data) => {
+  // Only log if something is actually playing and we get position updates
+  if (data && data.state && data.state.position && data.state.position > 1000 && data.state.position < 6000) {
+    console.log(`📡 Player is actively streaming data (Pos: ${data.state.position}ms)`);
+  }
+});
 // ----------------------
 
 // Load commands
