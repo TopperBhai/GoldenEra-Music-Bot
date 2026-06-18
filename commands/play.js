@@ -35,10 +35,10 @@ export default {
         isCategory = true;
       }
 
-      // 1. Search YouTube first to get accurate metadata (Hindi songs need this)
+      // 1. Search Spotify for accurate studio metadata and album covers
       let ytSearch = await player.search(searchQuery, {
         requestedBy: interaction.user,
-        searchEngine: QueryType.YOUTUBE
+        searchEngine: QueryType.SPOTIFY_SEARCH
       });
 
       if (!ytSearch || !ytSearch.tracks.length) {
@@ -64,10 +64,10 @@ export default {
       const author = isCategory && songDetails ? songDetails.artist : track.author;
 
       const embed = new EmbedBuilder()
-        .setColor('#FFD700')
+        .setColor('#1DB954') // Spotify Green
         .setTitle('🎶 Now Playing')
         .setDescription(`**${title}**\n${author}`)
-        .setFooter({ text: isCategory && songDetails?.message ? songDetails.message : `Source: Bridged via SoundCloud • ${track.duration}` })
+        .setFooter({ text: isCategory && songDetails?.message ? songDetails.message : `Source: Spotify High-Res • ${track.duration}` })
         .setTimestamp();
 
       if (track.thumbnail) {

@@ -50,7 +50,6 @@ import { BridgeProvider, BridgeSource } from '@discord-player/extractor';
 
 // --- DISCORD-PLAYER SETUP ---
 const player = new Player(client, {
-  bridgeProvider: new BridgeProvider(BridgeSource.SoundCloud),
   ytdlOptions: {
     quality: 'highestaudio',
     highWaterMark: 1 << 25
@@ -58,7 +57,14 @@ const player = new Player(client, {
 });
 
 // Register extractors
-await player.extractors.loadDefault();
+await player.extractors.loadDefault(
+  (ext) => ext !== 'YouTubeExtractor',
+  {
+    SpotifyExtractor: {
+      bridgeProvider: new BridgeProvider(BridgeSource.SoundCloud)
+    }
+  }
+);
 console.log('✅ Extractors registered successfully!');
 
 // --- Player Events ---
