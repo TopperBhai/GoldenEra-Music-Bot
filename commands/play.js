@@ -28,8 +28,21 @@ export default {
       let isCategory = false;
       let songDetails = null;
 
-      // Check if the query is a classic category
-      if (playlists[query.toLowerCase()]) {
+      // Convert YouTube links to text search to bypass YouTube IP blocks
+      if (query.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/)) {
+        try {
+          const oembedRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(query)}&format=json`);
+          if (oembedRes.ok) {
+            const data = await oembedRes.json();
+            // Clean up the title a bit for better soundcloud searching
+            searchQuery = data.title.replace(/(\(|\[).*?(official|video|lyric).*?(\)|\])/gi, '').trim();
+          } else {
+            return interaction.editReply('❌ YouTube link invalid or blocked. Please type the song name instead!');
+          }
+        } catch (e) {
+          console.error("oEmbed fetch failed", e);
+        }
+      } else if (playlists[query.toLowerCase()]) {
         const playlist = playlists[query.toLowerCase()];
         songDetails = getRandomSong(playlist);
         searchQuery = `${songDetails.title} ${songDetails.artist}`;

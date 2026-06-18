@@ -83,8 +83,14 @@ client.manager.on('playerEmpty', player => {
   // Do NOT destroy the player here. Let it stay in the voice channel to prevent reconnection bugs.
 });
 client.manager.on('playerClosed', (player, data) => console.warn(`⚠️ Player closed:`, data));
-client.manager.on('playerStuck', (player, data) => console.error(`❌ Player stuck:`, data));
-client.manager.on('playerException', (player, data) => console.error(`❌ Player exception:`, data));
+client.manager.on('playerStuck', (player, data) => {
+  console.error(`❌ Player stuck:`, data);
+  player.skip();
+});
+client.manager.on('playerException', (player, data) => {
+  console.error(`❌ Player exception:`, data);
+  player.skip();
+});
 client.manager.on('playerUpdate', (player, data) => {
   // Only log if something is actually playing and we get position updates
   if (data && data.state && data.state.position && data.state.position > 1000 && data.state.position < 6000) {
