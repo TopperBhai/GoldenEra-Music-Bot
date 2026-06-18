@@ -93,9 +93,19 @@ export class JioSaavnExtractor extends BaseExtractor {
       // 4. Return a backward-compatible stream using a clean PassThrough for perfect FFmpeg ingestion on Node 24
       const streamRes = await axios.get(streamUrl, { 
         responseType: 'stream',
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' }
+        validateStatus: () => true, // Never throw on 403, we will handle it manually
+        headers: { 'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 11; SM-G991B)' } // Native Android App spoofing
       });
       
+      if (streamRes.status !== 200) {
+        // We know exactly what the error is now!
+        const queue = this.context.player.nodes.get(info.guildId);
+        if (queue && queue.metadata && queue.metadata.channel) {
+           queue.metadata.channel.send(`⚠️ JioSaavn Datacenter Blocked MP4 Download. Status: ${streamRes.status}`);
+        }
+        throw new Error(`JioSaavn CDN returned ${streamRes.status}`);
+      }
+
       const pt = new PassThrough();
       streamRes.data.pipe(pt);
       return pt;
