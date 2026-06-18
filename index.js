@@ -3,7 +3,6 @@ dns.setDefaultResultOrder('ipv4first');
 import 'dotenv/config';
 import { Client, Collection, GatewayIntentBits, REST, Routes } from 'discord.js';
 import { Player, useQueue } from 'discord-player';
-import { YoutubeiExtractor } from 'discord-player-youtubei';
 import { readdirSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -47,48 +46,19 @@ const client = new Client({
 
 client.commands = new Collection();
 
+import { BridgeProvider, BridgeSource } from '@discord-player/extractor';
+
 // --- DISCORD-PLAYER SETUP ---
 const player = new Player(client, {
+  bridgeProvider: new BridgeProvider(BridgeSource.SoundCloud),
   ytdlOptions: {
     quality: 'highestaudio',
     highWaterMark: 1 << 25
   }
 });
 
-import fs from 'fs';
-
-let cookieStr = '';
-try {
-  if (fs.existsSync('./cookies.txt')) {
-    const lines = fs.readFileSync('./cookies.txt', 'utf8').split('\n');
-    cookieStr = lines.map(l => {
-      const p = l.split('\t');
-      if (p.length >= 7 && p[0].includes('.youtube.com')) return `${p[5]}=${p[6].trim()}`;
-    }).filter(Boolean).join('; ');
-    console.log('✅ Loaded YouTube Cookies for authentication!');
-  }
-} catch (e) {
-  console.log('⚠️ No valid cookies.txt found or failed to parse.');
-}
-
-import youtubedl from 'youtube-dl-exec';
-
 // Register extractors
-await player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
-await player.extractors.register(YoutubeiExtractor, {
-  cookie: cookieStr,
-  createStream: async (q, ext) => {
-    const output = await youtubedl(q.url, {
-      dumpSingleJson: true,
-      noWarnings: true,
-      noCallHome: true,
-      noCheckCertificate: true,
-      youtubeSkipDashManifest: true,
-      format: 'bestaudio',
-    });
-    return output.url;
-  }
-});
+await player.extractors.loadDefault();
 console.log('✅ Extractors registered successfully!');
 
 // --- Player Events ---
